@@ -15,7 +15,7 @@ import os
 router = Router()
 
 # Папка для временных файлов
-TEMP_DIR = "/mnt/okcomputer/output/dungeon_bot/data/temp"
+TEMP_DIR = 'temp_images'
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 
