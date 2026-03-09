@@ -58,11 +58,11 @@ async def cmd_tower(message: Message, custom_user_id: int = None):
     user_data = await db.get_user(user_id)
 
     if not user_data:
-        await message.answer("? Сначала используйте /start")
+        await message.answer("❌ Сначала используйте /start")
         return
 
     if user_data.get("is_dead"):
-        await message.answer("?? Вы мертвы!")
+        await message.answer("💀 Вы мертвы!")
         return
 
     # Если флаг в БД есть, но в памяти нет — пробуем восстановить.
@@ -70,7 +70,7 @@ async def cmd_tower(message: Message, custom_user_id: int = None):
         tower = await _restore_active_tower(user_id, user_data)
         if tower:
             await message.answer(
-                f"?? {hbold('Забег восстановлен!')}\n"
+                f"🗼 {hbold('Забег восстановлен!')}\n"
                 f"Вы продолжаете с {tower.current_floor} этажа.",
                 reply_markup=tower_action_keyboard(tower.tower_id),
             )
@@ -89,7 +89,7 @@ async def cmd_tower(message: Message, custom_user_id: int = None):
             user_data["in_tower"] = 0
         else:
             await message.answer(
-                f"?? Вы уже в Башне!\n"
+                f"🗼 Вы уже в Башне!\n"
                 f"Этаж: {tower.current_floor}\n"
                 f"HP: {tower.current_hp}/{tower.max_hp}",
                 reply_markup=tower_action_keyboard(tower.tower_id),
@@ -121,7 +121,7 @@ async def cmd_tower(message: Message, custom_user_id: int = None):
     await db.update_user(user_id, in_tower=1)
 
     await message.answer(
-        f"?? {hbold('БАШНЯ')}\n\n"
+        f"🗼 {hbold('БАШНЯ')}\n\n"
         f"Вы стоите у подножия легендарной Башни...\n"
         f"Всего этажей: {TowerSystem.TOTAL_FLOORS}\n"
         f"Ваше HP: {tower.current_hp}/{tower.max_hp}\n\n"
@@ -154,7 +154,7 @@ async def tower_action(callback: CallbackQuery):
 
     if not tower:
         await db.update_user(user_id, in_tower=0)
-        await callback.answer("Башня не найдена! Состояние сброшено.", show_alert=True)
+        await callback.answer("🗼 Башня не найдена! Состояние сброшено.", show_alert=True)
         return
 
     if action == "up":
@@ -177,12 +177,12 @@ async def handle_tower_up(callback: CallbackQuery, user_id: int, user_data: dict
     battle.state.player_hp = tower.current_hp
     battle.state.player_max_hp = tower.max_hp
 
-    msg = await callback.message.edit_text(battle.get_dynamic_ui(f"?? {hbold('Башня')}"))
+    msg = await callback.message.edit_text(battle.get_dynamic_ui(f"🗼 {hbold('Башня')}"))
 
     while battle.state.result == BattleResult.ONGOING:
         log = battle.execute_round()
         try:
-            await msg.edit_text(battle.get_dynamic_ui(f"?? {hbold('Башня')}", log))
+            await msg.edit_text(battle.get_dynamic_ui(f"🗼 {hbold('Башня')}", log))
         except TelegramBadRequest as e:
             if "message is not modified" not in str(e):
                 logger.warning("Tower UI edit failed for user_id=%s: %s", user_id, e)
@@ -193,7 +193,7 @@ async def handle_tower_up(callback: CallbackQuery, user_id: int, user_data: dict
     battle_state = battle.state
     tower.current_hp = max(0, battle_state.player_hp)
 
-    battle_log = "? Процесс боя:\n\n"
+    battle_log = "📜 Процесс боя:\n\n"
     for log in battle_state.logs[-2:]:
         battle_log += f"{log.message}\n"
 
@@ -225,17 +225,17 @@ async def handle_tower_up(callback: CallbackQuery, user_id: int, user_data: dict
 
         floor_type = TowerSystem.get_floor_type(tower.current_floor)
         type_names = {
-            "guardian": "Страж",
-            "keeper": "?? Хранитель",
-            "ego": "?? ЭГО БАШНИ",
+            "guardian": "🛡️ Страж",
+            "keeper": "🧙‍♂️ Хранитель",
+            "ego": "👁️‍🗨️ ЭГО БАШНИ",
         }
 
         victory_text = (
-            f"?? {hbold('БАШНЯ')}\n\n"
-            f"?? {hbold('Победа!')}\n"
+            f"🗼 {hbold('БАШНЯ')}\n\n"
+            f"🏆 {hbold('Победа!')}\n"
             f"{battle_log}\n"
-            f"? +{exp_reward} опыта\n"
-            f"?? +{coin_reward} монет\n\n"
+            f"⭐ +{exp_reward} опыта\n"
+            f"💰 +{coin_reward} монет\n\n"
             f"{hbold(f'Этаж {tower.current_floor}/{TowerSystem.TOTAL_FLOORS}')}\n"
             f"Следующий: {type_names.get(floor_type, 'Монстр')}\n\n"
             f"HP: {tower.current_hp}/{tower.max_hp}"
@@ -247,8 +247,8 @@ async def handle_tower_up(callback: CallbackQuery, user_id: int, user_data: dict
         )
     else:
         await callback.message.edit_text(
-            f"?? {hbold('БАШНЯ')}\n\n"
-            f"?? {hbold('ПОРАЖЕНИЕ')}\n\n"
+            f"🗼 {hbold('БАШНЯ')}\n\n"
+            f"💀 {hbold('ПОРАЖЕНИЕ')}\n\n"
             f"{battle_log}\n"
             f"Вы пали на этаже {tower.current_floor}..."
         )
@@ -266,7 +266,7 @@ async def handle_tower_heal(callback: CallbackQuery, user_id: int, user_data: di
         row = await cursor.fetchone()
 
     if not row or row["quantity"] <= 0:
-        await callback.answer("? Нет зелий!", show_alert=True)
+        await callback.answer("❌ Нет зелий!", show_alert=True)
         return
 
     await db.connection.execute(
@@ -283,8 +283,8 @@ async def handle_tower_heal(callback: CallbackQuery, user_id: int, user_data: di
     await db.connection.commit()
 
     await callback.message.edit_text(
-        f"?? {hbold('БАШНЯ')}\n\n"
-        f"?? Здоровье восстановлено!\n\n"
+        f"🗼 {hbold('БАШНЯ')}\n\n"
+        f"🧪 Здоровье восстановлено!\n\n"
         f"{hbold(f'Этаж {tower.current_floor}/{TowerSystem.TOTAL_FLOORS}')}\n"
         f"HP: {tower.current_hp}/{tower.max_hp}",
         reply_markup=tower_action_keyboard(tower.tower_id),
@@ -297,16 +297,16 @@ async def handle_tower_leave(callback: CallbackQuery, user_id: int, tower: Tower
     try:
         if tower.exp_gained > 0 or tower.coins_gained > 0:
             rewards_text = (
-                f"\n?? Добыча за забег уже начислена по ходу подъема:\n"
-                f"? {tower.exp_gained} опыта\n"
-                f"?? {tower.coins_gained} монет"
+                f"\n💎 Добыча за забег уже начислена по ходу подъема:\n"
+                f"⭐ {tower.exp_gained} опыта\n"
+                f"💰 {tower.coins_gained} монет"
             )
         else:
             rewards_text = ""
 
         await callback.message.edit_text(
-            f"?? {hbold('БАШНЯ')}\n\n"
-            f"?? Вы покинули Башню.{rewards_text}\n\n"
+            f"🗼 {hbold('БАШНЯ')}\n\n"
+            f"🏃 Вы покинули Башню.{rewards_text}\n\n"
             f"До этажа {tower.current_floor}",
             reply_markup=main_menu_keyboard(),
         )
@@ -314,7 +314,7 @@ async def handle_tower_leave(callback: CallbackQuery, user_id: int, tower: Tower
     except Exception:
         logger.exception("Failed to process tower leave for user_id=%s tower_id=%s", user_id, tower.tower_id)
         try:
-            await callback.answer("?? Не удалось корректно завершить забег.", show_alert=True)
+            await callback.answer("❌ Не удалось корректно завершить забег.", show_alert=True)
         except Exception:
             logger.exception("Failed to send tower leave fallback for user_id=%s", user_id)
     finally:
@@ -370,11 +370,11 @@ async def complete_tower(callback: CallbackQuery, user_id: int, user_data: dict,
             )
 
             await callback.message.answer(
-                f"?? {hbold('БАШНЯ ПРОЙДЕНА!')}\n\n"
-                f"? Опыт: +{rewards['exp']}\n"
-                f"?? Монеты: +{rewards['coins']}\n"
-                f"?? Класс. очки: +{rewards['class_points']}\n\n"
-                f"?? Предметы:\n{loot_text}\n"
+                f"🏆 {hbold('БАШНЯ ПРОЙДЕНА!')}\n\n"
+                f"⭐ Опыт: +{rewards['exp']}\n"
+                f"💰 Монеты: +{rewards['coins']}\n"
+                f"🎯 Класс. очки: +{rewards['class_points']}\n\n"
+                f"💎 Предметы:\n{loot_text}\n"
                 f"Вы покорили Башню!",
                 reply_markup=main_menu_keyboard(),
             )
@@ -382,7 +382,7 @@ async def complete_tower(callback: CallbackQuery, user_id: int, user_data: dict,
             if tower.difficulty == "realistic" and user_data.get("difficulty") == "realistic":
                 await db.update_user(user_id, is_dead=1, in_tower=0)
                 await callback.message.answer(
-                    f"?? {hbold('ВЫ ПАЛИ В БАШНЕ')}\n\n"
+                    f"💀 {hbold('ВЫ ПАЛИ В БАШНЕ')}\n\n"
                     f"Ваш персонаж потерян...\n"
                     f"Начните новую игру с /start",
                     reply_markup=main_menu_keyboard(),
@@ -390,7 +390,7 @@ async def complete_tower(callback: CallbackQuery, user_id: int, user_data: dict,
             else:
                 await db.update_user(user_id, in_tower=0)
                 await callback.message.answer(
-                    f"?? {hbold('Поражение в Башне')}\n\n"
+                    f"💀 {hbold('Поражение в Башне')}\n\n"
                     f"Вы потерпели поражение...\n"
                     f"Но можете попробовать снова!",
                     reply_markup=main_menu_keyboard(),
@@ -404,7 +404,7 @@ async def complete_tower(callback: CallbackQuery, user_id: int, user_data: dict,
         )
         try:
             await callback.message.answer(
-                "?? Внутренняя ошибка при завершении забега. Состояние сброшено, можно попробовать снова.",
+                "❌ Внутренняя ошибка при завершении забега. Состояние сброшено, можно попробовать снова.",
                 reply_markup=main_menu_keyboard(),
             )
         except Exception:
@@ -435,3 +435,4 @@ async def tower_menu_callback(callback: CallbackQuery):
     await callback.answer()
 
 
+#??
