@@ -47,11 +47,11 @@ async def cmd_dungeon(message: Message, custom_user_id: int = None):
     user_data = await db.get_user(user_id)
 
     if not user_data:
-        await message.answer("? Сначала используйте /start")
+        await message.answer("❌ Сначала используйте /start")
         return
 
     if user_data.get("is_dead"):
-        await message.answer("?? Вы мертвы! Начните новую игру с /start")
+        await message.answer("💀 Вы мертвы! Начните новую игру с /start")
         return
 
     # Восстановление/сброс рассинхрона in_dungeon <-> память/БД
@@ -59,7 +59,7 @@ async def cmd_dungeon(message: Message, custom_user_id: int = None):
         memory_run = active_dungeons.get(user_id)
         if memory_run:
             await message.answer(
-                "?? Вы уже в подземелье! Используйте кнопки для действий.",
+                "⚔️ Вы уже в подземелье! Используйте кнопки для действий.",
                 reply_markup=dungeon_action_keyboard(memory_run.dungeon_id),
             )
             return
@@ -68,7 +68,7 @@ async def cmd_dungeon(message: Message, custom_user_id: int = None):
         if db_run:
             dungeon = await _restore_dungeon_from_db(user_id, user_data, db_run)
             await message.answer(
-                f"?? {hbold('Забег восстановлен!')}\n"
+                f"⚔️ {hbold('Забег восстановлен!')}\n"
                 f"Комната: {dungeon.current_room_idx + 1}/10\n"
                 f"HP: {dungeon.current_hp}/{dungeon.max_hp}",
                 reply_markup=dungeon_action_keyboard(dungeon.dungeon_id),
@@ -85,7 +85,7 @@ async def cmd_dungeon(message: Message, custom_user_id: int = None):
         dungeon = await _restore_dungeon_from_db(user_id, user_data, active_db_dungeon)
         await db.update_user(user_id, in_dungeon=1)
         await message.answer(
-            f"?? {hbold('Найден незавершенный забег!')}\n"
+            f"🏰 {hbold('Найден незавершенный забег!')}\n"
             f"Комната: {dungeon.current_room_idx + 1}/10\n"
             f"HP: {dungeon.current_hp}/{dungeon.max_hp}",
             reply_markup=dungeon_action_keyboard(dungeon.dungeon_id),
@@ -108,7 +108,7 @@ async def cmd_dungeon(message: Message, custom_user_id: int = None):
     await db.update_user(user_id, in_dungeon=1)
 
     await message.answer(
-        f"?? {hbold('Подземелье')}\n\n"
+        f"🏰 {hbold('Подземелье')}\n\n"
         f"Вы входите в тёмное подземелье...\n"
         f"Всего комнат: {len(dungeon.rooms)}\n"
         f"Ваше HP: {dungeon.current_hp}/{dungeon.max_hp}\n\n"
@@ -165,7 +165,7 @@ async def handle_continue(callback: CallbackQuery, user_id: int, user_data: dict
             await db.update_dungeon(dungeon.dungeon_id, current_room=dungeon.current_room_idx + 1)
             next_room = dungeon.get_current_room()
             await callback.message.edit_text(
-                f"?? {hbold('Подземелье')}\n\n"
+                f"🏰 {hbold('Подземелье')}\n\n"
                 f"Вы проходите в следующую комнату...\n\n"
                 f"{hbold(f'Комната {next_room.room_num}/10')}\n"
                 f"HP: {dungeon.current_hp}/{dungeon.max_hp}\n\n"
@@ -182,7 +182,7 @@ async def handle_continue(callback: CallbackQuery, user_id: int, user_data: dict
         if dungeon.advance_room():
             await db.update_dungeon(dungeon.dungeon_id, current_room=dungeon.current_room_idx + 1)
             await callback.message.edit_text(
-                f"?? {hbold('Подземелье')}\n\n"
+                f"🏰 {hbold('Подземелье')}\n\n"
                 f"Комната пуста...\n\n"
                 f"{hbold(f'Комната {dungeon.current_room_idx + 1}/10')}\n"
                 f"HP: {dungeon.current_hp}/{dungeon.max_hp}",
@@ -196,11 +196,11 @@ async def handle_continue(callback: CallbackQuery, user_id: int, user_data: dict
     battle.state.player_hp = dungeon.current_hp
     battle.state.player_max_hp = dungeon.max_hp
 
-    await callback.message.edit_text(battle.get_dynamic_ui(f"?? {hbold('Подземелье')}"))
+    await callback.message.edit_text(battle.get_dynamic_ui(f"🏰 {hbold('Подземелье')}"))
 
     while battle.state.result == BattleResult.ONGOING:
         log = battle.execute_round()
-        ui_text = battle.get_dynamic_ui(f"?? {hbold('Подземелье')}", log)
+        ui_text = battle.get_dynamic_ui(f"🏰 {hbold('Подземелье')}", log)
 
         try:
             await callback.message.edit_text(ui_text)
@@ -218,7 +218,7 @@ async def handle_continue(callback: CallbackQuery, user_id: int, user_data: dict
     battle_state = battle.state
     dungeon.current_hp = max(0, battle_state.player_hp)
 
-    battle_log = "? Процесс боя:\n\n"
+    battle_log = "📜 Процесс боя:\n\n"
     for log in battle_state.logs[-2:]:
         battle_log += f"{log.message}\n"
 
@@ -240,7 +240,7 @@ async def handle_continue(callback: CallbackQuery, user_id: int, user_data: dict
                 item_type = random.choice(["weapon", "armor", "artifact", "active_skill", "passive_skill"])
                 item = generate_random_item(item_type, loot["rarity"], loot["level"])
                 item["name"] = generate_item_name(item_type, loot["rarity"])
-                item["description"] = "Трофей из комнаты босса ??"
+                item["description"] = "Трофей из комнаты босса 👹"
                 item["item_id"] = f"{item_type}_{user_id}_{int(time.time())}"
 
                 await db.create_item(**item)
@@ -248,17 +248,17 @@ async def handle_continue(callback: CallbackQuery, user_id: int, user_data: dict
                 loot_text += f"• {item['name']} ({loot['rarity']})\n"
 
         victory_text = (
-            f"?? {hbold('Подземелье')}\n\n"
-            f"?? {hbold('Бой окончен!')}\n\n"
+            f"🏰 {hbold('Подземелье')}\n\n"
+            f"⚔️ {hbold('Бой окончен!')}\n\n"
             f"{battle_log}\n"
-            f"?? {hbold('ПОБЕДА!')}\n\n"
-            f"?? Награды:\n"
-            f"? Опыт: +{exp_reward}\n"
-            f"?? Монеты: +{coin_reward}\n"
+            f"🏆 {hbold('ПОБЕДА!')}\n\n"
+            f"🎁 Награды:\n"
+            f"⭐ Опыт: +{exp_reward}\n"
+            f"💰 Монеты: +{coin_reward}\n"
         )
 
         if loot_text:
-            victory_text += f"\n?? Лут:\n{loot_text}"
+            victory_text += f"\n💎 Лут:\n{loot_text}"
 
         victory_text += f"\nHP: {dungeon.current_hp}/{dungeon.max_hp}"
 
@@ -273,10 +273,10 @@ async def handle_continue(callback: CallbackQuery, user_id: int, user_data: dict
             )
     else:
         await callback.message.edit_text(
-            f"?? {hbold('Подземелье')}\n\n"
-            f"?? {hbold('Бой окончен!')}\n\n"
+            f"🏰 {hbold('Подземелье')}\n\n"
+            f"⚔️ {hbold('Бой окончен!')}\n\n"
             f"{battle_log}\n"
-            f"?? {hbold('ПОРАЖЕНИЕ')}\n\n"
+            f"💀 {hbold('ПОРАЖЕНИЕ')}\n\n"
             f"Вы пали в бою..."
         )
         await complete_dungeon(callback, user_id, user_data, dungeon, success=False)
@@ -293,7 +293,7 @@ async def handle_heal(callback: CallbackQuery, user_id: int, user_data: dict, du
         row = await cursor.fetchone()
 
     if not row or row["quantity"] <= 0:
-        await callback.answer("? У вас нет зелий исцеления!", show_alert=True)
+        await callback.answer("❌ У вас нет зелий исцеления!", show_alert=True)
         return
 
     await db.connection.execute(
@@ -306,8 +306,8 @@ async def handle_heal(callback: CallbackQuery, user_id: int, user_data: dict, du
     await db.update_dungeon(dungeon.dungeon_id, current_hp=dungeon.current_hp)
 
     await callback.message.edit_text(
-        f"?? {hbold('Подземелье')}\n\n"
-        f"?? {hbold('Исцеление!')}\n"
+        f"🏰 {hbold('Подземелье')}\n\n"
+        f"🧪 {hbold('Исцеление!')}\n"
         f"Ваше здоровье полностью восстановлено!\n\n"
         f"HP: {dungeon.current_hp}/{dungeon.max_hp}\n\n"
         f"Что дальше?",
@@ -320,16 +320,16 @@ async def handle_leave(callback: CallbackQuery, user_id: int, dungeon):
     """Покинуть подземелье"""
     if dungeon.exp_gained > 0 or dungeon.coins_gained > 0:
         rewards_text = (
-            f"\n?? Добыча за забег уже начислена по ходу прохождения:\n"
-            f"? Опыт: {dungeon.exp_gained}\n"
-            f"?? Монеты: {dungeon.coins_gained}"
+            f"\n💎 Добыча за забег уже начислена по ходу прохождения:\n"
+            f"⭐ Опыт: {dungeon.exp_gained}\n"
+            f"💰 Монеты: {dungeon.coins_gained}"
         )
     else:
         rewards_text = ""
 
     await callback.message.edit_text(
-        f"?? {hbold('Подземелье')}\n\n"
-        f"?? Вы покинули подземелье.{rewards_text}\n\n"
+        f"🏰 {hbold('Подземелье')}\n\n"
+        f"🏃 Вы покинули подземелье.{rewards_text}\n\n"
         f"Безопасность превыше всего!",
         reply_markup=main_menu_keyboard(),
     )
@@ -360,8 +360,8 @@ async def complete_dungeon(callback: CallbackQuery, user_id: int, user_data: dic
         )
 
         await callback.message.answer(
-            f"?? {hbold('Подземелье пройдено!')}\n\n"
-            f"? Бонус за прохождение: +{clear_exp} опыта!\n\n"
+            f"🏆 {hbold('Подземелье пройдено!')}\n\n"
+            f"⭐ Бонус за прохождение: +{clear_exp} опыта!\n\n"
             f"Отличная работа, искатель приключений!",
             reply_markup=main_menu_keyboard(),
         )
@@ -369,7 +369,7 @@ async def complete_dungeon(callback: CallbackQuery, user_id: int, user_data: dic
         if dungeon.difficulty == "realistic" and user_data.get("difficulty") == "realistic":
             await db.update_user(user_id, is_dead=1, in_dungeon=0)
             await callback.message.answer(
-                f"?? {hbold('ВЫ ПАЛИ')}\n\n"
+                f"💀 {hbold('ВЫ ПАЛИ')}\n\n"
                 f"В реалистичном режиме смерть перманентна...\n"
                 f"Ваш персонаж потерян навсегда.\n\n"
                 f"Начните новую игру с /start",
@@ -378,12 +378,12 @@ async def complete_dungeon(callback: CallbackQuery, user_id: int, user_data: dic
         else:
             await db.update_user(user_id, in_dungeon=0)
             await callback.message.answer(
-                f"?? {hbold('Поражение')}\n\n"
+                f"💀 {hbold('Поражение')}\n\n"
                 f"Вы потерпели поражение в подземелье...\n"
                 f"Но можете попробовать снова!",
                 reply_markup=main_menu_keyboard(),
             )
-
+#??
     await db.update_dungeon(dungeon.dungeon_id, is_active=0)
     active_dungeons.pop(user_id, None)
 
