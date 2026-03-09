@@ -101,7 +101,7 @@ async def cmd_coop(message: Message, command: CommandObject = None):
     # Быстрый invite через reply
     if message.reply_to_message:
         if message.reply_to_message.from_user.is_bot:
-            return await message.answer("? Ботов нельзя брать в рейд!")
+            return await message.answer("❌ Ботов нельзя брать в рейд!")
 
         friend_id = message.reply_to_message.from_user.id
 
@@ -113,12 +113,12 @@ async def cmd_coop(message: Message, command: CommandObject = None):
 
         if not is_friend:
             return await message.answer(
-                "? Этот игрок не в вашем списке друзей! Сначала добавьте его: /addfriend"
+                "❌ Этот игрок не в вашем списке друзей! Сначала добавьте его: /addfriend"
             )
 
         buttons = [
-            [InlineKeyboardButton(text="?? Подземелье", callback_data=f"invite_coop:dungeon:{friend_id}")],
-            [InlineKeyboardButton(text="?? Башня", callback_data=f"invite_coop:tower:{friend_id}")],
+            [InlineKeyboardButton(text="🏰 Подземелье", callback_data=f"invite_coop:dungeon:{friend_id}")],
+            [InlineKeyboardButton(text="🗼 Башня", callback_data=f"invite_coop:tower:{friend_id}")],
         ]
         return await message.answer(
             f"Куда пригласим {hbold(message.reply_to_message.from_user.first_name)}?",
@@ -138,17 +138,17 @@ async def cmd_coop(message: Message, command: CommandObject = None):
 
     if not friends_list:
         return await message.answer(
-            "? У вас нет друзей для совместной игры! Ответьте на сообщение игрока командой /addfriend"
+            "❌ У вас нет друзей для совместной игры! Ответьте на сообщение игрока командой /addfriend"
         )
 
     buttons = []
     for fr in friends_list:
         name = fr["first_name"] or fr["username"] or "Игрок"
-        buttons.append([InlineKeyboardButton(text=f"?? Данж с {name}", callback_data=f"invite_coop:dungeon:{fr['friend_id']}")])
-        buttons.append([InlineKeyboardButton(text=f"?? Башня с {name}", callback_data=f"invite_coop:tower:{fr['friend_id']}")])
+        buttons.append([InlineKeyboardButton(text=f"🏰 Данж с {name}", callback_data=f"invite_coop:dungeon:{fr['friend_id']}")])
+        buttons.append([InlineKeyboardButton(text=f"🗼 Башня с {name}", callback_data=f"invite_coop:tower:{fr['friend_id']}")])
 
     await message.answer(
-        f"?? {hbold('Ко-оп Режим')}\n\n"
+        f"🤝 {hbold('Ко-оп Режим')}\n\n"
         f"Выберите друга для совместного похода:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
     )
@@ -164,19 +164,19 @@ async def send_coop_invite(callback: CallbackQuery):
 
     friend_data = await db.get_user(friend_id)
     if friend_data is None:
-        await callback.answer("? Игрок не найден или удален.", show_alert=True)
+        await callback.answer("❌ Игрок не найден или удален.", show_alert=True)
         return
 
     if friend_data.get("in_dungeon") or friend_data.get("in_tower"):
-        await callback.answer("? Ваш друг сейчас уже находится в рейде!", show_alert=True)
+        await callback.answer("❌ Ваш друг сейчас уже находится в рейде!", show_alert=True)
         return
 
     coop_invites[friend_id] = {"host_id": host_id, "mode": mode}
-    mode_name = "Подземелье ??" if mode == "dungeon" else "Башню ??"
+    mode_name = "Подземелье 🏰" if mode == "dungeon" else "Башню 🗼"
 
     host_name = callback.from_user.first_name or "Игрок"
     invite_text = (
-        f"?? {hbold('Приглашение в Ко-оп!')}\n\n"
+        f"💌 {hbold('Приглашение в Ко-оп!')}\n\n"
         f"{host_name} зовет вас в совместный поход в {hbold(mode_name)}!\n\n"
         f"Ваши статы будут объединены, а лут разделен поровну."
     )
@@ -187,8 +187,8 @@ async def send_coop_invite(callback: CallbackQuery):
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
                 [
-                    InlineKeyboardButton(text="? Принять", callback_data=f"accept_coop:{host_id}"),
-                    InlineKeyboardButton(text="? Отклонить", callback_data=f"decline_coop:{host_id}"),
+                    InlineKeyboardButton(text="✅ Принять", callback_data=f"accept_coop:{host_id}"),
+                    InlineKeyboardButton(text="❌ Отклонить", callback_data=f"decline_coop:{host_id}"),
                 ]
             ]
         ),
@@ -197,13 +197,13 @@ async def send_coop_invite(callback: CallbackQuery):
     if not sent:
         coop_invites.pop(friend_id, None)
         await callback.answer(
-            "? Не удалось отправить приглашение. Возможно, игрок заблокировал бота.",
+            "❌ Не удалось отправить приглашение. Возможно, игрок заблокировал бота.",
             show_alert=True,
         )
         return
 
     try:
-        await callback.message.edit_text(f"?? Приглашение в {mode_name} отправлено! Ожидаем ответа...")
+        await callback.message.edit_text(f"✅ Приглашение в {mode_name} отправлено! Ожидаем ответа...")
     except TelegramBadRequest as e:
         logger.warning("Could not edit invite source message host_id=%s: %s", host_id, e)
     except Exception:
@@ -218,13 +218,13 @@ async def decline_coop(callback: CallbackQuery):
     coop_invites.pop(user_id, None)
 
     try:
-        await callback.message.edit_text("? Вы отклонили приглашение.")
+        await callback.message.edit_text("❌ Вы отклонили приглашение.")
     except TelegramBadRequest as e:
         logger.warning("Could not edit decline message user_id=%s: %s", user_id, e)
     except Exception:
         logger.exception("Unexpected decline edit error user_id=%s", user_id)
 
-    await _safe_send(callback.bot, host_id, "? Ваш друг отклонил приглашение в поход.")
+    await _safe_send(callback.bot, host_id, "❌ Ваш друг отклонил приглашение в поход.")
 
 
 @router.callback_query(F.data.startswith("accept_coop:"))
@@ -234,7 +234,7 @@ async def accept_coop(callback: CallbackQuery):
 
     invite = coop_invites.get(user_id)
     if not invite or invite["host_id"] != host_id:
-        return await callback.answer("? Приглашение устарело или не найдено!", show_alert=True)
+        return await callback.answer("❌ Приглашение устарело или не найдено!", show_alert=True)
 
     mode = invite["mode"]
     coop_invites.pop(user_id, None)
@@ -242,9 +242,9 @@ async def accept_coop(callback: CallbackQuery):
     host_data = await db.get_user(host_id)
     invited_data = await db.get_user(user_id)
     if host_data is None or invited_data is None:
-        await callback.message.edit_text("? Не удалось начать ко-оп: один из игроков недоступен.")
+        await callback.message.edit_text("❌ Не удалось начать ко-оп: один из игроков недоступен.")
         if host_data is not None:
-            await _safe_send(callback.bot, host_id, "? Ко-оп отменен: напарник недоступен.")
+            await _safe_send(callback.bot, host_id, "❌ Ко-оп отменен: напарник недоступен.")
         return
 
     party_id = f"party_{host_id}_{user_id}"
@@ -256,13 +256,13 @@ async def accept_coop(callback: CallbackQuery):
     }
 
     try:
-        await callback.message.edit_text("? Вы приняли приглашение! Подготовка к походу...")
+        await callback.message.edit_text("✅ Вы приняли приглашение! Подготовка к походу...")
     except TelegramBadRequest as e:
         logger.warning("Could not edit accept message user_id=%s: %s", user_id, e)
     except Exception:
         logger.exception("Unexpected accept edit error user_id=%s", user_id)
 
-    await _safe_send(callback.bot, host_id, "? Ваш напарник присоединился! Начинаем совместный поход...")
+    await _safe_send(callback.bot, host_id, "🤝 Ваш напарник присоединился! Начинаем совместный поход...")
 
     try:
         await start_coop_run(party_id, callback.bot)
@@ -273,7 +273,7 @@ async def accept_coop(callback: CallbackQuery):
             await _notify_party_text(
                 callback.bot,
                 party,
-                "?? Не удалось запустить ко-оп. Пати распущено, попробуйте снова.",
+                "❌ Не удалось запустить ко-оп. Пати распущено, попробуйте снова.",
             )
         _drop_party(party_id)
 
@@ -304,11 +304,11 @@ async def handle_coop_action(callback: CallbackQuery):
             await db.add_coins(partner_id, coins_each)
 
         escape_text = (
-            f"???>? {hbold('ПОБЕГ ИЗ ПОДЗЕМЕЛЬЯ')}\n\n"
+            f"🏃‍♂️💨 {hbold('ПОБЕГ ИЗ ПОДЗЕМЕЛЬЯ')}\n\n"
             f"Один из рейдеров запаниковал и бросился к выходу! Группа экстренно отступает!\n\n"
-            f"?? Ваша доля (50%):\n"
-            f"? Опыт: +{exp_each}\n"
-            f"?? Монеты: +{coins_each}"
+            f"💰 Ваша доля (50%):\n"
+            f"⭐ Опыт: +{exp_each}\n"
+            f"🪙 Монеты: +{coins_each}"
         )
 
         try:
@@ -333,7 +333,7 @@ async def handle_coop_action(callback: CallbackQuery):
             party["votes"] = {}
             await callback.answer("Группа готова! Идем дальше!")
 
-            loading_text = "?? Напарник готов! Входим в следующую комнату..."
+            loading_text = "⚔️ Напарник готов! Входим в следующую комнату..."
             await _safe_edit(
                 callback.bot,
                 party["player1"],
@@ -355,7 +355,7 @@ async def handle_coop_action(callback: CallbackQuery):
                 callback.bot,
                 user_id,
                 msg_id,
-                "? Вы готовы идти дальше.\nОжидание решения напарника...",
+                "✅ Вы готовы идти дальше.\nОжидание решения напарника...",
             )
 
 
@@ -374,9 +374,9 @@ async def start_coop_run(party_id: str, bot):
     if p1_data is None or p2_data is None:
         logger.warning("Party startup aborted, missing users: party_id=%s p1_exists=%s p2_exists=%s", party_id, bool(p1_data), bool(p2_data))
         if p1_data is not None:
-            await _safe_send(bot, party["player1"], "? Ко-оп отменен: напарник недоступен.")
+            await _safe_send(bot, party["player1"], "❌ Ко-оп отменен: напарник недоступен.")
         if p2_data is not None:
-            await _safe_send(bot, party["player2"], "? Ко-оп отменен: напарник недоступен.")
+            await _safe_send(bot, party["player2"], "❌ Ко-оп отменен: напарник недоступен.")
         _drop_party(party_id)
         return
 
@@ -396,24 +396,24 @@ async def start_coop_run(party_id: str, bot):
     msg1 = await _safe_send(
         bot,
         party["player1"],
-        f"?? {hbold('ВРЕМЯ РЕЙДА!')}\n"
+        f"⚔️ {hbold('ВРЕМЯ РЕЙДА!')}\n"
         f"Вы объединили силы с {party['p2_name']}.\n"
-        f"Ваше общее HP: ?? {party['max_hp']}",
+        f"Ваше общее HP: ❤️ {party['max_hp']}",
     )
     msg2 = await _safe_send(
         bot,
         party["player2"],
-        f"?? {hbold('ВРЕМЯ РЕЙДА!')}\n"
+        f"⚔️ {hbold('ВРЕМЯ РЕЙДА!')}\n"
         f"Вы объединили силы с {party['p1_name']}.\n"
-        f"Ваше общее HP: ?? {party['max_hp']}",
+        f"Ваше общее HP: ❤️ {party['max_hp']}",
     )
 
     if not msg1 or not msg2:
         logger.warning("Failed to send raid intro screens, party_id=%s", party_id)
         if msg1:
-            await _safe_send(bot, party["player1"], "? Ко-оп отменен: не удалось синхронизировать группу.")
+            await _safe_send(bot, party["player1"], "❌ Ко-оп отменен: не удалось синхронизировать группу.")
         if msg2:
-            await _safe_send(bot, party["player2"], "? Ко-оп отменен: не удалось синхронизировать группу.")
+            await _safe_send(bot, party["player2"], "❌ Ко-оп отменен: не удалось синхронизировать группу.")
         _drop_party(party_id)
         return
 
@@ -437,15 +437,17 @@ async def generate_next_coop_room(party_id: str, bot):
     p2_data = await db.get_user(party["player2"])
     if p1_data is None or p2_data is None:
         logger.warning("Party interrupted, missing users during room generation: party_id=%s", party_id)
-        await _notify_party_text(bot, party, "? Поход остановлен: один из игроков недоступен.")
+        await _notify_party_text(bot, party, "❌ Поход остановлен: один из игроков недоступен.")
         _drop_party(party_id)
         return
 
     p1 = await db.build_player_from_user(p1_data)
     p2 = await db.build_player_from_user(p2_data)
 
+    enemy_level = max(p1.level, p2.level)
+
     if mode == "dungeon":
-        title = f"?? Ко-оп Подземелье (Комната {floor})"
+        title = f"🏰 Ко-оп Подземелье (Комната {floor})"
         if floor % 10 == 0:
             enemy_template = get_random_boss(enemy_level)
         elif floor % 5 == 0:
@@ -453,7 +455,7 @@ async def generate_next_coop_room(party_id: str, bot):
         else:
             enemy_template = get_random_mob(enemy_level)
     else:
-        title = f"?? Ко-оп Башня (Этаж {floor})"
+        title = f"🗼 Ко-оп Башня (Этаж {floor})"
         enemy_template = TowerSystem.get_floor_enemy(floor)
     enemy = copy.deepcopy(enemy_template)
 
@@ -477,7 +479,7 @@ async def generate_next_coop_room(party_id: str, bot):
         is_married = True
 
     if is_married:
-        party["team_name"] = f"?? {party['p1_name']} & {party['p2_name']} (Супруги)"
+        party["team_name"] = f"💍 {party['p1_name']} & {party['p2_name']} (Супруги)"
         buff = 1.15
     else:
         party["team_name"] = f"{party['p1_name']} & {party['p2_name']}"
@@ -509,7 +511,7 @@ async def generate_next_coop_room(party_id: str, bot):
     battle_state = battle.state
     party["current_hp"] = max(0, battle_state.player_hp)
 
-    battle_log = "? Процесс боя:\n\n"
+    battle_log = "📜 Процесс боя:\n\n"
     for log in battle_state.logs[-2:]:
         battle_log += f"{log.message}\n"
 
@@ -521,18 +523,18 @@ async def generate_next_coop_room(party_id: str, bot):
         win_text = (
             f"{title}\n\n"
             f"{battle_log}\n"
-            f"?? {hbold('ВРАГ ПОВЕРЖЕН!')}\n\n"
-            f"?? Общий лут группы (будет поделен 50/50 при выходе):\n"
-            f"? Опыт: {party['total_exp']}\n"
-            f"?? Монеты: {party['total_coins']}\n\n"
-            f"?? Общее HP: {party['current_hp']}/{party['max_hp']}\n\n"
+            f"🏆 {hbold('ВРАГ ПОВЕРЖЕН!')}\n\n"
+            f"🎁 Общий лут группы (будет поделен 50/50 при выходе):\n"
+            f"⭐ Опыт: {party['total_exp']}\n"
+            f"💰 Монеты: {party['total_coins']}\n\n"
+            f"❤️ Общее HP: {party['current_hp']}/{party['max_hp']}\n\n"
             f"Что делаем дальше?"
         )
 
         markup = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="?? Идти дальше", callback_data=f"coop_action:{party_id}:continue")],
-                [InlineKeyboardButton(text="???>? Сбежать (Забрать лут)", callback_data=f"coop_action:{party_id}:leave")],
+                [InlineKeyboardButton(text="⚔️ Идти дальше", callback_data=f"coop_action:{party_id}:continue")],
+                [InlineKeyboardButton(text="🏃‍♂️💨 Сбежать (Забрать лут)", callback_data=f"coop_action:{party_id}:leave")],
             ]
         )
 
@@ -542,7 +544,7 @@ async def generate_next_coop_room(party_id: str, bot):
         lose_text = (
             f"{title}\n\n"
             f"{battle_log}\n"
-            f"?? {hbold('ПОРАЖЕНИЕ!')}\n\n"
+            f"💀 {hbold('ПОРАЖЕНИЕ!')}\n\n"
             f"Группа была уничтожена. Вы потеряли весь накопленный в рейде лут..."
         )
         markup = InlineKeyboardMarkup(
@@ -553,6 +555,6 @@ async def generate_next_coop_room(party_id: str, bot):
         await _safe_edit(bot, party["player2"], party["msg2_id"], lose_text, reply_markup=markup)
         _drop_party(party_id)
 
-
+#??
 
 
