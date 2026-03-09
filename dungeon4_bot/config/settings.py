@@ -28,7 +28,7 @@ class Settings(BaseSettings):
             "name": "Лёгкий",
             "exp_multiplier": 1.0,
             "coin_multiplier": 1.0,
-            "enemy_multiplier": 0.3,
+            "enemy_multiplier": 0.1,
             "pvp_loot_chance": 0.20,
             "can_change": True,
             "permadeath": False
@@ -37,7 +37,7 @@ class Settings(BaseSettings):
             "name": "Нормальный",
             "exp_multiplier": 3.0,
             "coin_multiplier": 3.0,
-            "enemy_multiplier": 0.5,
+            "enemy_multiplier": 0.4,
             "pvp_loot_chance": 0.40,
             "can_change": True,
             "permadeath": False
@@ -46,7 +46,7 @@ class Settings(BaseSettings):
             "name": "Сложный",
             "exp_multiplier": 5.0,
             "coin_multiplier": 5.0,
-            "enemy_multiplier": 1.3,
+            "enemy_multiplier": 1.0,
             "pvp_loot_chance": 0.60,
             "can_change": True,
             "permadeath": False
@@ -55,7 +55,7 @@ class Settings(BaseSettings):
             "name": "Реалистичный",
             "exp_multiplier": 10.0,
             "coin_multiplier": 10.0,
-            "enemy_multiplier": 2.2,
+            "enemy_multiplier": 1.6,
             "pvp_loot_chance": 0.90,
             "can_change": False,
             "permadeath": True
