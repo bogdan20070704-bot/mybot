@@ -68,7 +68,7 @@ async def cmd_profile(message: Message, custom_user_id: int = None):
         await message.answer("❌ Сначала используйте /start")
         return
 
-    player = Player.from_db(user_data)
+    player = await db.build_player_from_user(user_data)
     rank_name = get_rank_name(player.level)
     next_rank = get_next_rank_level(player.level)
 
