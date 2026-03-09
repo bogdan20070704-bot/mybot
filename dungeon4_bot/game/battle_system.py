@@ -166,7 +166,7 @@ class BattleSystem:
         target_name = self.enemy.name if is_attacker_player else "Вас"
 
         # Шанс 20% наложить эффект в зависимости от типа урона
-        if random.random() < 0.20:
+        if random.random() < 0.15:
             if dmg_type == 'magic':
                 target_effects['burn'] = 3
                 log = f"\n🔥 {target_name} подожгли на 3 хода!"
@@ -773,3 +773,4 @@ class PvPBattle:
             ui += f"\n⚔ Процесс боя:\n\n{log.message}"
             
         return ui
+
