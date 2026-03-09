@@ -14,8 +14,8 @@ import os
 
 router = Router()
 
-# Папка для временных файлов
-TEMP_DIR = "/mnt/okcomputer/output/dungeon_bot/data/temp"
+# Удаляй старый жесткий путь и ставь просто название папки
+TEMP_DIR = "temp_files" 
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 
