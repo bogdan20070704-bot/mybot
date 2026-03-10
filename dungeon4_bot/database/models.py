@@ -109,7 +109,8 @@ class Database:
                 is_dead INTEGER DEFAULT 0,
                 in_dungeon INTEGER DEFAULT 0,
                 in_tower INTEGER DEFAULT 0,
-                in_battle INTEGER DEFAULT 0
+                in_battle INTEGER DEFAULT 0,
+                active_potion TEXT DEFAULT NULL
             )
         """)
         
@@ -591,6 +592,7 @@ class Database:
             await self.connection.execute("ALTER TABLE users ADD COLUMN guild_rank TEXT DEFAULT 'member'")
             await self.connection.execute("ALTER TABLE users ADD COLUMN cards_sold INTEGER DEFAULT 0")
             await self.connection.execute("ALTER TABLE users ADD COLUMN cards_bought INTEGER DEFAULT 0")
+            await self.connection.execute("ALTER TABLE users ADD COLUMN active_potion TEXT")
         except Exception:
             pass # Колонки уже добавлены
 
@@ -632,6 +634,18 @@ class Database:
         await self.connection.execute(
             f"UPDATE users SET {fields} WHERE user_id = ?",
             values
+        )
+        await self.connection.commit()
+
+    async def set_active_potion(self, user_id: int, potion_type: str):
+        """Выпить зелье (установить активный бафф на следующий бой)"""
+        await self.update_user(user_id, active_potion=potion_type)
+
+    async def clear_active_potion(self, user_id: int):
+        """Очистить эффект зелья (вызывается сразу после старта боя)"""
+        await self.connection.execute(
+            "UPDATE users SET active_potion = NULL WHERE user_id = ?", 
+            (user_id,)
         )
         await self.connection.commit()
 
@@ -1929,6 +1943,7 @@ class Database:
 
 # Глобальный объект базы данных
 db = Database()
+
 
 
 
