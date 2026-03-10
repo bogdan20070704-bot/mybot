@@ -6,6 +6,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.markdown import hbold
 from datetime import datetime
+import json
 
 from database.models import db
 
@@ -108,29 +109,62 @@ async def accept_marriage(callback: CallbackQuery):
         
     del marriage_proposals[target_id]
     
-    # Записываем брак в БД
+    # 1. Записываем брак в БД
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     await db.connection.execute(
         "INSERT INTO marriages (partner1_id, partner2_id, date_married) VALUES (?, ?, ?)",
         (host_id, target_id, now)
     )
     
-    # 👇 НОВАЯ ФИШКА: Выдаем уникальные кольца (Тип: Артефакт)
+    # 2. Выдаем уникальные кольца со ВСЕМИ полями из твоей базы
     ring_name = "💍 Кольцо Истинной Любви"
-    # Мощные стартовые статы кольца:
-    for u_id in (host_id, target_id):
-        await db.connection.execute("""
-            INSERT INTO items (user_id, item_type, name, hp_bonus, attack_bonus, defense_bonus, speed_bonus, level)
-            VALUES (?, 'artifact', ?, 100, 20, 20, 10, 1)
-        """, (u_id, ring_name))
-        
-    await db.connection.commit()
+    ring_desc = "Символ нерушимой связи. Дарует супругам Адаптацию к любому урону."
     
+    # Запаковываем баффы и резисты в JSON, как того требует БД
+    ring_buffs = json.dumps([{"stat": "adaptation", "value": 5}])
+    ring_res = json.dumps({}) # Пустые резисты по умолчанию
+    
+    try:
+        for u_id in (host_id, target_id):
+            await db.connection.execute("""
+                INSERT INTO items (
+                    user_id, name, description, item_type, rarity, level, 
+                    hp_bonus, attack_bonus, defense_bonus, speed_bonus, 
+                    damage_type, damage_value, resistances, buffs, price
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                u_id,                  # user_id
+                ring_name,             # name
+                ring_desc,             # description (desc)
+                'artifact',            # item_type (type)
+                'legendary',           # rarity
+                1,                     # level
+                100,                   # hp_bonus (hp)
+                20,                    # attack_bonus (atk)
+                20,                    # defense_bonus (def)
+                10,                    # speed_bonus (spd)
+                'physical',            # damage_type (dmg_type)
+                0,                     # damage_value (dmg_val)
+                ring_res,              # resistances (res)
+                ring_buffs,            # buffs (buff)
+                50000                  # price
+            ))
+        await db.connection.commit()
+    except Exception as e:
+        print(f"Ошибка выдачи кольца: {e}")
+        pass 
+    
+    # 👇 ФИКС 1: Отвечаем Телеграму, чтобы убрать "часики" загрузки с кнопки!
+    await callback.answer("💍 Вы согласились!", show_alert=False)
+    
+    # 3. Меняем сообщение
     await callback.message.edit_text(
-        f"💖 Вы сказали ДА! Поздравляем молодоженов!\n\n"
+        f"💖 {hbold('ВЫ СКАЗАЛИ ДА!')}\n\nПоздравляем молодоженов!\n\n"
         f"🎁 Вам обоим в инвентарь добавлен уникальный артефакт: {hbold(ring_name)}! "
         f"Не забудьте экипировать его в /deck."
     )
+    
+    # 4. Отправляем уведомление партнеру
     try:
         await callback.bot.send_message(
             host_id, 
@@ -140,14 +174,21 @@ async def accept_marriage(callback: CallbackQuery):
     except:
         pass
 
+
 @router.callback_query(F.data.startswith("marry_decline:"))
 async def decline_marriage(callback: CallbackQuery):
     target_id = callback.from_user.id
     host_id = int(callback.data.split(":")[1])
     
-    if target_id in marriage_proposals:
+    # 👇 ФИКС 2: Строго проверяем, что удаляем предложение именно от ТОГО парня/девушки
+    if marriage_proposals.get(target_id) == host_id:
         del marriage_proposals[target_id]
+    else:
+        return await callback.answer("❌ Предложение уже недействительно.", show_alert=True)
         
+    # 👇 ФИКС 3: Убираем "часики" загрузки с кнопки "Нет"
+    await callback.answer()
+    
     await callback.message.edit_text("💔 Вы ответили отказом.")
     try:
         await callback.bot.send_message(host_id, "💔 Ваше предложение руки и сердца было отклонено...")
@@ -173,4 +214,5 @@ async def cmd_divorce(message: Message):
     try:
         await message.bot.send_message(spouse_id, "📜 Ваш партнер подал на развод. Вы больше не в браке. 🥀")
     except:
+
         pass
