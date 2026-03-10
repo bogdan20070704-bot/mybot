@@ -555,6 +555,45 @@ async def generate_next_coop_room(party_id: str, bot):
         await _safe_edit(bot, party["player2"], party["msg2_id"], lose_text, reply_markup=markup)
         _drop_party(party_id)
 
-#??
+@router.callback_query(F.data == "menu:coop")
+async def coop_menu_callback(callback: CallbackQuery):
+    """Открытие Ко-оп меню через инлайн-кнопку"""
+    user_id = callback.from_user.id
+    await init_friends_table()
+
+    # Ищем подтвержденных друзей
+    async with db.connection.execute(
+        """
+        SELECT f.friend_id, u.username, u.first_name, u.level
+        FROM friends f
+        JOIN users u ON f.friend_id = u.user_id
+        WHERE f.user_id = ? AND f.status = 'accepted'
+        """,
+        (user_id,),
+    ) as cursor:
+        friends_list = await cursor.fetchall()
+
+    if not friends_list:
+        return await callback.answer(
+            "❌ У вас пока нет друзей! Ответьте на сообщение другого игрока командой /addfriend, чтобы добавить его.",
+            show_alert=True
+        )
+
+    # Генерируем кнопки с друзьями
+    buttons = []
+    for fr in friends_list:
+        name = fr["first_name"] or fr["username"] or "Игрок"
+        buttons.append([InlineKeyboardButton(text=f"🏰 Данж с {name}", callback_data=f"invite_coop:dungeon:{fr['friend_id']}")])
+        buttons.append([InlineKeyboardButton(text=f"🗼 Башня с {name}", callback_data=f"invite_coop:tower:{fr['friend_id']}")])
+
+    buttons.append([InlineKeyboardButton(text="🔙 Назад к боям", callback_data="menu:battle_menu")])
+
+    await callback.message.edit_text(
+        f"🤝 {hbold('Ко-оп Режим')}\n\n"
+        f"Выберите друга для совместного похода:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+    )
+    await callback.answer()
+
 
 
