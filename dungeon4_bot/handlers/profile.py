@@ -10,12 +10,14 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from aiogram.utils.markdown import hbold
 
+
 from database.models import db
 from handlers.marriage import get_spouse
 from keyboards.inline import (
     class_point_spending_keyboard,
     gamemode_change_keyboard,
     main_menu_keyboard,
+    battle_menu_keyboard,
     profile_keyboard,
 )
 from models.player import Player
