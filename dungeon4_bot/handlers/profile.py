@@ -523,11 +523,18 @@ async def classpoint_spent(callback: CallbackQuery):
 
 @router.callback_query(F.data == "profile:marriage")
 async def profile_marriage_handler(callback: CallbackQuery):
-    """Открывает раздел семьи/брака"""
-    from handlers.marriage import cmd_marriage # Импортируем функцию показа брака
+    """Показывает всплывающее окно со статусом брака"""
+    from handlers.marriage import get_spouse
     
     user_id = callback.from_user.id
-    # Вызываем функцию из твоего модуля браков
-    # Мы передаем callback.message, чтобы функция отрисовала меню брака
-    await cmd_marriage(callback.message, custom_user_id=user_id)
-    await callback.answer()
+    spouse_id = await get_spouse(user_id)
+    
+    if spouse_id:
+        spouse_data = await db.get_user(spouse_id)
+        name = spouse_data.get("first_name") or spouse_data.get("username") or "Игрок"
+        text = f"💍 Вы состоите в браке с: {name}!\n\n(Для развода используйте команду /divorce)"
+    else:
+        text = "💔 Вы свободны.\n\nЧтобы сделать предложение, напишите /marry @username или ответьте на сообщение игрока командой /marry!"
+        
+    # show_alert=True покажет красивое окошко прямо по центру экрана
+    await callback.answer(text, show_alert=True)
