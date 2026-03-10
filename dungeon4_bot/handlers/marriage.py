@@ -100,6 +100,8 @@ async def cmd_marry(message: Message, command: CommandObject = None):
     except:
         await message.answer("❌ Не удалось отправить предложение. Возможно, игрок заблокировал бота.")
 
+import uuid # 👈 Не забудь оставить этот импорт вверху!
+
 @router.callback_query(F.data.startswith("marry_accept:"))
 async def accept_marriage(callback: CallbackQuery):
     target_id = callback.from_user.id
@@ -116,57 +118,44 @@ async def accept_marriage(callback: CallbackQuery):
         "INSERT INTO marriages (partner1_id, partner2_id, date_married) VALUES (?, ?, ?)",
         (host_id, target_id, now)
     )
+    await db.connection.commit()
     
     # 2. Выдаем уникальные кольца
     ring_name = "💍 Кольцо Истинной Любви"
     ring_desc = "Символ нерушимой связи. Дарует супругам Адаптацию к любому урону."
     
-    ring_buffs = json.dumps([{"stat": "adaptation", "value": 5}])
-    ring_res = json.dumps({}) 
+    # Баффы для кольца
+    ring_buffs = [{"stat": "adaptation", "value": 5}]
     
     try:
         for u_id in (host_id, target_id):
-            # Генерируем уникальный ID для кольца (чтобы база не ругалась на дубликаты)
             unique_item_id = f"ring_{u_id}_{str(uuid.uuid4())[:8]}"
             
-            # Сначала создаем шаблон кольца в таблице items
-            await db.connection.execute("""
-                INSERT INTO items (
-                    item_id, name, description, item_type, rarity, level, 
-                    hp_bonus, attack_bonus, defense_bonus, speed_bonus, 
-                    damage_type, damage_value, resistances, buffs, price
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                unique_item_id,        # 👈 ВОТ ОН, УНИКАЛЬНЫЙ ID!
-                ring_name,             
-                ring_desc,             
-                'artifact',            
-                'legendary',           
-                1,                     
-                100,                   
-                20,                    
-                20,                    
-                10,                    
-                'physical',            
-                0,                     
-                ring_res,              
-                ring_buffs,            
-                50000                  
-            ))
+            # 👇 ИСПРАВЛЕНИЕ: Используем твои встроенные методы базы данных!
+            # Они сами разберутся с правильными колонками (min_level, buy_price и json)
+            await db.create_item(
+                item_id=unique_item_id,
+                name=ring_name,
+                description=ring_desc,
+                item_type="artifact",
+                rarity="legendary",
+                level=1,
+                hp_bonus=100,
+                attack_bonus=20,
+                defense_bonus=20,
+                speed_bonus=10,
+                buffs=ring_buffs,
+                price=50000
+            )
             
-            # А теперь самое главное: кладем это кольцо игроку в инвентарь!
-            # Без этого шага оно висит в базе шаблонов, но не у игрока.
-            await db.connection.execute("""
-                INSERT INTO inventory (user_id, item_id, item_type, quantity)
-                VALUES (?, ?, ?, ?)
-            """, (u_id, unique_item_id, 'artifact', 1))
+            # Добавляем кольцо в инвентарь игроку
+            await db.add_item_to_inventory(u_id, unique_item_id)
             
-        await db.connection.commit()
     except Exception as e:
         print(f"Ошибка выдачи кольца: {e}")
         pass 
     
-    # Отвечаем Телеграму, чтобы убрать "часики" загрузки
+    # Убираем часики загрузки
     await callback.answer("💍 Вы согласились!", show_alert=False)
     
     # 3. Меняем сообщение
@@ -228,4 +217,5 @@ async def cmd_divorce(message: Message):
     except:
 
         pass
+
 
