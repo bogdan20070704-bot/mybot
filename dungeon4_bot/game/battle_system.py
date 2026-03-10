@@ -56,7 +56,7 @@ class BattleSystem:
     """Система боёв"""
     
     
-    def __init__(self, player: Player, enemy: Enemy, difficulty: str = 'easy'):
+    def __init__(self, player: Player, enemy: Enemy, difficulty: str = 'easy', active_potions: List[str] = None):
         self.player = player
         self.enemy = enemy
         self.difficulty = difficulty
@@ -64,6 +64,20 @@ class BattleSystem:
         # Получаем характеристики
         self.player_stats = player.get_total_stats()
         
+        # Получаем урон игрока по типам
+        self.player_damage = player.deck.get_damage_output()
+
+        # === НОВОЕ: ПРИМЕНЯЕМ ЭФФЕКТЫ ЗЕЛИЙ ===
+        self.active_potions = active_potions or []
+        if 'strength' in self.active_potions:
+            self.player_stats.attack = int(self.player_stats.attack * 1.5)
+            # Увеличиваем весь урон от оружия тоже на 50%!
+            for k in self.player_damage:
+                self.player_damage[k] = int(self.player_damage[k] * 1.5)
+                
+        if 'speed' in self.active_potions:
+            self.player_stats.speed = int(self.player_stats.speed * 1.5)
+            
         # Рассчитываем силу предметов игрока
         gear_score = self._calculate_gear_score()
         
@@ -81,9 +95,6 @@ class BattleSystem:
         self.state.enemy_max_hp = enemy_stats['hp']
         
         self.enemy_stats = enemy_stats
-        
-        # Получаем урон игрока по типам
-        self.player_damage = player.deck.get_damage_output()
         
         # Получаем сопротивления
         self.player_resistances = player.deck.get_all_resistances()
@@ -881,6 +892,7 @@ class PvPBattle:
             ui += f"\n⚔ Процесс боя:\n\n{log.message}"
             
         return ui
+
 
 
 
