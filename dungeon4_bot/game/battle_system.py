@@ -48,7 +48,8 @@ class BattleState:
     items_dropped: List[Dict] = field(default_factory=list)
 
     # НОВОЕ: Адаптация
-    current_adaptation: int = 0
+    current_adaptation: int = 0  # Для игрока (PvE) или Игрока 1 (PvP)
+    enemy_adaptation: int = 0    # Для Игрока 2 (PvP)
 
 
 class BattleSystem:
@@ -671,9 +672,31 @@ class PvPBattle:
         
         self.p1_resistances = player1.deck.get_all_resistances()
         self.p2_resistances = player2.deck.get_all_resistances()
+
+        # === НОВОЕ: Считаем шаги адаптации для ПвП ===
+        self.p1_adaptation_step = self._get_adaptation_from_deck(player1)
+        self.p2_adaptation_step = self._get_adaptation_from_deck(player2)
+
+    def _get_adaptation_from_deck(self, player: Player) -> int:
+        """Ищет бафф адаптации в экипировке игрока"""
+        total_adapt = 0
+        for item in player.deck.get_all_items():
+            if not item or not hasattr(item, "buffs") or not item.buffs: continue
+            buffs = item.buffs
+            if isinstance(buffs, dict):
+                adapt = buffs.get("adaptation")
+                if isinstance(adapt, dict): total_adapt += int(adapt.get("value", 0))
+                elif isinstance(adapt, (int, float)): total_adapt += int(adapt)
+                continue
+            for buff in buffs:
+                if isinstance(buff, dict):
+                    if (buff.get("stat") or buff.get("name")) == "adaptation": total_adapt += int(buff.get("value", 0))
+                    continue
+                if (getattr(buff, "stat", None) or getattr(buff, "name", None)) == "adaptation": total_adapt += int(getattr(buff, "value", 0))
+        return total_adapt
     
     def execute_round(self) -> BattleLog:
-        """Выполнить раунд PvP с учетом брони и вампиризма"""
+        """Выполнить раунд PvP с учетом брони, вампиризма и адаптации"""
         p1_speed = self.p1_stats.speed
         p2_speed = self.p2_stats.speed
         speed_diff = abs(p1_speed - p2_speed)
@@ -686,7 +709,7 @@ class PvPBattle:
 
         # Абсолютное превосходство
         if p1_speed - p2_speed >= 100:
-            damage, _ = self._calc_pvp_damage(self.p1_stats, self.p2_stats, self.p2_resistances, self.p1_damage)
+            damage, _ = self._calc_pvp_damage(self.p1_stats, self.p2_stats, self.p2_resistances, self.p1_damage, getattr(self.state, 'enemy_adaptation', 0))
             self.state.enemy_hp -= damage
             log.message = f"⚡ {self.player1.first_name or 'Игрок 1'} слишком быстр! Урон: {damage}"
             if p1_vampirism > 0:
@@ -695,7 +718,7 @@ class PvPBattle:
                 log.message += f"\n🦇 Вампиризм лечит на {heal} HP!"
             
         elif p2_speed - p1_speed >= 100:
-            damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage)
+            damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage, getattr(self.state, 'current_adaptation', 0))
             self.state.player_hp -= damage
             log.message = f"💨 {self.player2.first_name or 'Игрок 2'} слишком быстр! Урон: {damage}"
             if p2_vampirism > 0:
@@ -707,7 +730,7 @@ class PvPBattle:
             # Обычный бой
             if p1_speed > p2_speed:
                 # Игрок 1 первый
-                damage, _ = self._calc_pvp_damage(self.p1_stats, self.p2_stats, self.p2_resistances, self.p1_damage)
+                damage, _ = self._calc_pvp_damage(self.p1_stats, self.p2_stats, self.p2_resistances, self.p1_damage, getattr(self.state, 'enemy_adaptation', 0))
                 self.state.enemy_hp -= damage
                 log.message = f"⚔️ {self.player1.first_name or 'Игрок 1'} наносит {damage} урона!"
                 if p1_vampirism > 0:
@@ -716,7 +739,7 @@ class PvPBattle:
                     log.message += f" (🦇 +{heal} HP)"
                 
                 if self.state.enemy_hp > 0:
-                    damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage)
+                    damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage, getattr(self.state, 'current_adaptation', 0))
                     self.state.player_hp -= damage
                     log.message += f"\n🔥 {self.player2.first_name or 'Игрок 2'} отвечает на {damage}!"
                     if p2_vampirism > 0:
@@ -725,7 +748,7 @@ class PvPBattle:
                         log.message += f" (🦇 +{heal} HP)"
             else:
                 # Игрок 2 первый
-                damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage)
+                damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage, getattr(self.state, 'current_adaptation', 0))
                 self.state.player_hp -= damage
                 log.message = f"🔥 {self.player2.first_name or 'Игрок 2'} наносит {damage} урона!"
                 if p2_vampirism > 0:
@@ -734,7 +757,7 @@ class PvPBattle:
                     log.message += f" (🦇 +{heal} HP)"
                 
                 if self.state.player_hp > 0:
-                    damage, _ = self._calc_pvp_damage(self.p1_stats, self.p2_stats, self.p2_resistances, self.p1_damage)
+                    damage, _ = self._calc_pvp_damage(self.p1_stats, self.p2_stats, self.p2_resistances, self.p1_damage, getattr(self.state, 'enemy_adaptation', 0))
                     self.state.enemy_hp -= damage
                     log.message += f"\n⚔️ {self.player1.first_name or 'Игрок 1'} отвечает на {damage}!"
                     if p1_vampirism > 0:
@@ -749,14 +772,23 @@ class PvPBattle:
         elif self.state.player_hp <= 0:
             self.state.result = BattleResult.DEFEAT
             self._calculate_pvp_rewards(winner_is_player1=False)
+            
+        # === НОВОЕ: УВЕЛИЧЕНИЕ АДАПТАЦИИ ===
+        if getattr(self, 'p1_adaptation_step', 0) > 0 and getattr(self.state, 'current_adaptation', 0) < 100:
+            self.state.current_adaptation = min(100, getattr(self.state, 'current_adaptation', 0) + self.p1_adaptation_step)
+            log.message += f"\n🛡 {self.player1.first_name or 'Игрок 1'} адаптируется! ({self.state.current_adaptation}%)"
+            
+        if getattr(self, 'p2_adaptation_step', 0) > 0 and getattr(self.state, 'enemy_adaptation', 0) < 100:
+            self.state.enemy_adaptation = min(100, getattr(self.state, 'enemy_adaptation', 0) + self.p2_adaptation_step)
+            log.message += f"\n🛡 {self.player2.first_name or 'Игрок 2'} адаптируется! ({self.state.enemy_adaptation}%)"
         
         self.state.logs.append(log)
         self.state.round_num += 1
         return log
     
     def _calc_pvp_damage(self, attacker_stats: Stats, defender_stats: Stats, defender_resistances: Dict,
-                        damage_output: Dict) -> Tuple[int, str]:
-        """Рассчитать урон в PvP с учетом брони"""
+                        damage_output: Dict, defender_adaptation: int = 0) -> Tuple[int, str]:
+        """Рассчитать урон в PvP с учетом брони и АДАПТАЦИИ"""
         defense = defender_stats.defense
         total_damage = 0
         
@@ -778,6 +810,11 @@ class PvPBattle:
             
             resistance = defender_resistances.get(dmg_type, 0)
             total_damage += dmg_after_armor * (1 - resistance)
+            
+        # === НОВОЕ: СРЕЗАЕМ УРОН ОТ АДАПТАЦИИ ===
+        if defender_adaptation > 0:
+            reduction = total_damage * (defender_adaptation / 100.0)
+            total_damage -= reduction
         
         if random.random() < 0.1: total_damage *= 1.5
         total_damage *= random.uniform(0.8, 1.2)
@@ -844,6 +881,7 @@ class PvPBattle:
             ui += f"\n⚔ Процесс боя:\n\n{log.message}"
             
         return ui
+
 
 
 
