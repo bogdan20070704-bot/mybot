@@ -39,15 +39,16 @@ class Enemy:
     loot_table: List[Dict] = field(default_factory=list)
     
     def calculate_stats(self, player_level: int, player_gear_score: float = 0,
-                       difficulty: str = 'easy') -> Dict[str, int]:
+                        difficulty: str = 'easy') -> Dict[str, int]:
         """Рассчитать характеристики врага для боя"""
         diff_settings = settings.DIFFICULTY_SETTINGS.get(difficulty, {})
         
-        # Коэффициент уровня
-        scale_lvl = 1 + (player_level * 0.06)
+        # Коэффициент уровня: снизили с 7% до 4% за уровень (мягкий рост)
+        scale_lvl = 1 + (player_level * 0.04)
         
-        # Коэффициент предметов
-        scale_gear = 1 + (player_gear_score * 0.4)
+        # Коэффициент предметов: СИЛЬНО снизили (с 40% до 2%). 
+        # Теперь хорошая экипировка делает ИГРОКА сильнее моба, а не наоборот!
+        scale_gear = 1 + (player_gear_score * 0.08)
         
         # Коэффициент сложности
         scale_diff = diff_settings.get('enemy_multiplier', 1.0)
@@ -55,11 +56,14 @@ class Enemy:
         # Множитель типа врага
         boss_mult = settings.BOSS_MULTIPLIERS.get(self.enemy_type, 1.0)
         
+        # Итоговый множитель (чтобы не перегружать формулу ниже)
+        total_mult = scale_lvl * scale_gear * scale_diff * boss_mult
+        
         return {
-            'hp': int(self.base_hp * scale_lvl * scale_gear * scale_diff * boss_mult),
-            'attack': int(self.base_attack * scale_lvl * scale_gear * scale_diff * boss_mult),
-            'speed': int(self.base_speed * scale_lvl * scale_gear * scale_diff * boss_mult),
-            'defense': int(self.base_defense * scale_lvl * scale_gear * scale_diff * boss_mult)
+            'hp': int(self.base_hp * total_mult),
+            'attack': int(self.base_attack * total_mult),
+            'speed': int(self.base_speed * total_mult),
+            'defense': int(self.base_defense * total_mult)
         }
     
     def get_exp_reward(self, difficulty: str = 'easy') -> int:
@@ -150,19 +154,6 @@ ENEMIES_DB = {
         resistances={'physical': 0.3},
         exp_reward=9,
         coin_reward=35
-    ),
-    'ghost': Enemy(
-        enemy_id='ghost',
-        name='Призрак',
-        description='Бестелесный дух, игнорирует физический урон',
-        enemy_type='mob',
-        base_hp=40,
-        base_attack=10,
-        base_speed=20,
-        base_defense=0,
-        resistances={'physical': 1.0},  # Полный иммунитет
-        exp_reward=12,
-        coin_reward=40
     ),
     
     # Мини-боссы
