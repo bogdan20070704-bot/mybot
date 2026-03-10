@@ -44,11 +44,11 @@ class Enemy:
         diff_settings = settings.DIFFICULTY_SETTINGS.get(difficulty, {})
         
         # Коэффициент уровня: снизили с 7% до 4% за уровень (мягкий рост)
-        scale_lvl = 1 + (player_level * 0.05)
+        scale_lvl = 1 + (player_level * 0.055)
         
         # Коэффициент предметов: СИЛЬНО снизили (с 40% до 2%). 
         # Теперь хорошая экипировка делает ИГРОКА сильнее моба, а не наоборот!
-        scale_gear = 1 + (player_gear_score * 0.12)
+        scale_gear = 1 + (player_gear_score * 0.185)
         
         # Коэффициент сложности
         scale_diff = diff_settings.get('enemy_multiplier', 1.0)
