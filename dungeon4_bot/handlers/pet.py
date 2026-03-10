@@ -197,9 +197,10 @@ async def feed_pet(callback: CallbackQuery):
         b = p_info['bonuses']
         
         # 💥 ГЛАВНАЯ ФИШКА: Накидываем статы прямо в базу данных Игрока!
+       # 💥 ГЛАВНАЯ ФИШКА: Накидываем статы прямо в базу данных Игрока!
         await db.connection.execute("""
             UPDATE users 
-            SET hp = hp + ?, attack = attack + ?, defense = defense + ?, speed = speed + ?
+            SET base_hp = base_hp + ?, base_attack = base_attack + ?, base_defense = base_defense + ?, base_speed = base_speed + ?
             WHERE user_id = ?
         """, (b['hp'], b['attack'], b['defense'], b['speed'], user_id))
         
@@ -372,4 +373,5 @@ async def process_pet_return(message, pet):
         )
     
     await db.connection.commit()
+
     await message.answer(msg_text)
