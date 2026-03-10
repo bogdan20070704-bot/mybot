@@ -26,7 +26,10 @@ def monarch_action_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="⚔️ В бой!", callback_data="monarch:continue")],
-            [InlineKeyboardButton(text="🧪 Выпить зелье (Здоровье)", callback_data="monarch:heal")],
+            [
+                InlineKeyboardButton(text="❤️ Исцелиться", callback_data="monarch:heal"),
+                InlineKeyboardButton(text="🧪 Мои зелья", callback_data="potions:belt") # 👇 И сюда!
+            ],
             [InlineKeyboardButton(text="🏃‍♂️ Сбежать", callback_data="monarch:leave")]
         ]
     )
@@ -252,3 +255,4 @@ async def monarch_menu_callback(callback: CallbackQuery):
     await cmd_monarch(callback.message, custom_user_id=callback.from_user.id)
 
     await callback.answer()
+
