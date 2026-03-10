@@ -192,7 +192,20 @@ async def handle_continue(callback: CallbackQuery, user_id: int, user_data: dict
         return
 
     player = await db.build_player_from_user(user_data)
-    battle = BattleSystem(player, current_room.enemy, dungeon.difficulty)
+    
+    # === НОВОЕ: АКТИВИРУЕМ ЗЕЛЬЕ В БОЮ ===
+    active_buff = user_data.get("active_potion")
+    potions = [active_buff] if active_buff else []
+    
+    # Передаем potions в боевую систему
+    battle = BattleSystem(player, current_room.enemy, dungeon.difficulty, active_potions=potions)
+    
+    # Сразу сбрасываем бафф в БД и в памяти, чтобы он действовал ровно ОДИН бой (на одну комнату)
+    if active_buff:
+        await db.clear_active_potion(user_id)
+        user_data["active_potion"] = None 
+    # ======================================
+
     battle.state.player_hp = dungeon.current_hp
     battle.state.player_max_hp = dungeon.max_hp
 
@@ -393,5 +406,6 @@ async def dungeon_menu_callback(callback: CallbackQuery):
     """Подземелье из меню"""
     await cmd_dungeon(callback.message, custom_user_id=callback.from_user.id)
     await callback.answer()
+
 
 
