@@ -16,6 +16,7 @@ from aiogram.utils.markdown import hbold
 from handlers.coop import active_parties
 from handlers.dungeon import active_dungeons
 from handlers.tower import active_towers
+from handlers import monarch
 
 # Добавляем главную папку проекта в пути поиска Python
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -85,6 +86,7 @@ dp.include_router(pet.router)
 dp.include_router(friends.router)
 dp.include_router(coop.router)
 dp.include_router(marriage.router)
+dp.include_router(monarch.router)
 # 👇 ФИКС 2: Ставим общий роутер строго В КОНЦЕ списка!
 # Теперь он будет ловить только обычный текст для опыта.
 dp.include_router(main_router)
@@ -462,4 +464,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
