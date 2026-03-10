@@ -173,7 +173,19 @@ async def handle_tower_up(callback: CallbackQuery, user_id: int, user_data: dict
         return
 
     player = await db.build_player_from_user(user_data)
-    battle = BattleSystem(player, enemy, tower.difficulty)
+    
+    # === НОВОЕ: АКТИВИРУЕМ ЗЕЛЬЕ В БОЮ В БАШНЕ ===
+    active_buff = user_data.get("active_potion")
+    potions = [active_buff] if active_buff else []
+    
+    battle = BattleSystem(player, enemy, tower.difficulty, active_potions=potions)
+    
+    # Сразу сбрасываем бафф в БД, чтобы он действовал ровно ОДИН этаж
+    if active_buff:
+        await db.clear_active_potion(user_id)
+        user_data["active_potion"] = None 
+    # ======================================
+    
     battle.state.player_hp = tower.current_hp
     battle.state.player_max_hp = tower.max_hp
 
@@ -184,7 +196,7 @@ async def handle_tower_up(callback: CallbackQuery, user_id: int, user_data: dict
         try:
             await msg.edit_text(battle.get_dynamic_ui(f"🗼 {hbold('Башня')}", log))
         except TelegramBadRequest as e:
-            if "message is not modified" not in str(e):
+            if "message is not modified" not in str(e).lower():
                 logger.warning("Tower UI edit failed for user_id=%s: %s", user_id, e)
         except Exception:
             logger.exception("Unexpected tower UI update error for user_id=%s", user_id)
@@ -436,3 +448,4 @@ async def tower_menu_callback(callback: CallbackQuery):
 
 
 #??
+
