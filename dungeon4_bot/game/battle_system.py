@@ -47,6 +47,9 @@ class BattleState:
     coins_gained: int = 0
     items_dropped: List[Dict] = field(default_factory=list)
 
+    # НОВОЕ: Адаптация
+    current_adaptation: int = 0
+
 
 class BattleSystem:
     """Система боёв"""
@@ -91,6 +94,32 @@ class BattleSystem:
         
         # НОВОЕ: Получаем % вампиризма из предметов игрока
         self.vampirism_percent = self._get_vampirism_from_deck()
+
+        # === ДОБАВЛЯЕМ АДАПТАЦИЮ ===
+        self.adaptation_step = self._get_adaptation_from_deck()
+
+    def _get_adaptation_from_deck(self) -> int:
+        """Ищет бафф адаптации в экипировке"""
+        total_adapt = 0
+        for item in self.player.deck.get_all_items():
+            if not item or not hasattr(item, "buffs") or not item.buffs:
+                continue
+            buffs = item.buffs
+            
+            if isinstance(buffs, dict):
+                adapt = buffs.get("adaptation")
+                if isinstance(adapt, dict): total_adapt += int(adapt.get("value", 0))
+                elif isinstance(adapt, (int, float)): total_adapt += int(adapt)
+                continue
+                
+            for buff in buffs:
+                if isinstance(buff, dict):
+                    if (buff.get("stat") or buff.get("name")) == "adaptation":
+                        total_adapt += int(buff.get("value", 0))
+                    continue
+                if (getattr(buff, "stat", None) or getattr(buff, "name", None)) == "adaptation":
+                    total_adapt += int(getattr(buff, "value", 0))
+        return total_adapt
 
     def _get_vampirism_from_deck(self) -> int:
         """Ищет бафф вампиризма в экипировке"""
@@ -283,6 +312,12 @@ class BattleSystem:
             if random.random() < 0.1:
                 total_damage *= 1.5
             total_damage *= random.uniform(0.8, 1.2)
+        
+        # === НОВОЕ: СРЕЗАЕМ УРОН ОТ АДАПТАЦИИ ===
+        # Если бьет враг, и у нас есть накопленная адаптация, режем урон!
+        if not is_player and getattr(self.state, 'current_adaptation', 0) > 0:
+            reduction = total_damage * (self.state.current_adaptation / 100.0)
+            total_damage -= reduction
         
         if total_damage <= 0:
             return 0, damage_type_used
@@ -504,6 +539,11 @@ class BattleSystem:
             self._calculate_rewards()
         elif self.state.player_hp <= 0:
             self.state.result = BattleResult.DEFEAT
+        
+        # === НОВОЕ: УВЕЛИЧЕНИЕ АДАПТАЦИИ ===
+        if getattr(self, 'adaptation_step', 0) > 0 and self.state.current_adaptation < 100:
+            self.state.current_adaptation = min(100, self.state.current_adaptation + self.adaptation_step)
+            log.message += f"\n🛡 Вы адаптируетесь! Ваш резист ко всем атакам теперь {self.state.current_adaptation}%."
         
         self.state.logs.append(log)
         self.state.round_num += 1
@@ -804,5 +844,6 @@ class PvPBattle:
             ui += f"\n⚔ Процесс боя:\n\n{log.message}"
             
         return ui
+
 
 
