@@ -34,7 +34,8 @@ def dungeon_action_keyboard(dungeon_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="⚔️ Продолжить", callback_data=f"dungeon:{dungeon_id}:continue"),
         ],
         [
-            InlineKeyboardButton(text="🧪 Исцелиться", callback_data=f"dungeon:{dungeon_id}:heal"),
+            InlineKeyboardButton(text="❤️ Исцелиться", callback_data=f"dungeon:{dungeon_id}:heal"),
+            InlineKeyboardButton(text="🧪 Мои зелья", callback_data="potions:belt"),
         ],
         [
             InlineKeyboardButton(text="🏃 Уйти", callback_data=f"dungeon:{dungeon_id}:leave"),
@@ -50,7 +51,8 @@ def tower_action_keyboard(tower_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="⬆️ Вверх", callback_data=f"tower:{tower_id}:up"),
         ],
         [
-            InlineKeyboardButton(text="🧪 Исцелиться", callback_data=f"tower:{tower_id}:heal"),
+            InlineKeyboardButton(text="❤️ Исцелиться", callback_data=f"tower:{tower_id}:heal"),
+            InlineKeyboardButton(text="🧪 Мои зелья", callback_data="potions:belt"),
         ],
         [
             InlineKeyboardButton(text="🏃 Покинуть", callback_data=f"tower:{tower_id}:leave"),
@@ -309,7 +311,8 @@ def battle_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="👑 Бой с Монархом", callback_data="menu:monarch"),
         ],
         [
-            InlineKeyboardButton(text="🤝 Кооператив", callback_data="menu:coop"), # Задел на будущее!
+            InlineKeyboardButton(text="🧪 Мои зелья", callback_data="potions:belt"),
+            InlineKeyboardButton(text="🤝 Кооператив", callback_data="menu:coop"),
         ],
         [
             InlineKeyboardButton(text="🔙 В главное меню", callback_data="menu:main")
