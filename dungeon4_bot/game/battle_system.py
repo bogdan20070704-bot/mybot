@@ -222,26 +222,25 @@ class BattleSystem:
         """
         # 1. Определяем защиту цели (defense)
         if is_player:
-            # Бьет игрок, защищается враг
             defense = self.enemy_stats.get('defense', 0) if isinstance(self.enemy_stats, dict) else getattr(self.enemy_stats, 'defense', 0)
         else:
-            # Бьет враг, защищается игрок
             defense = self.player_stats.get('defense', 0) if isinstance(self.player_stats, dict) else getattr(self.player_stats, 'defense', 0)
 
         total_damage = 0
         damage_type_used = 'physical'
         is_conceptual_oneshot = False
         
-        # Получаем базовую атаку
         base_attack = attacker_stats.get('attack', 0) if isinstance(attacker_stats, dict) else getattr(attacker_stats, 'attack', 0)
-        
-        # Защита от пустого урона (если нет оружия - бьем кулаками)
         temp_damage_output = dict(damage_output) if damage_output else {}
-        if not temp_damage_output:
-            temp_damage_output['physical'] = 0
-            
-        # Базовая атака всегда прибавляется к физике
-        temp_damage_output['physical'] = temp_damage_output.get('physical', 0) + (base_attack * 0.5)
+        
+        # 🛡 ИСПРАВЛЕНИЕ: Правильно формируем урон врагов для пробития брони
+        if is_player:
+            if not temp_damage_output:
+                temp_damage_output['physical'] = 0
+            temp_damage_output['physical'] = temp_damage_output.get('physical', 0) + (base_attack * 0.5)
+        else:
+            enemy_dmg_type = getattr(self.enemy, 'damage_type', 'physical')
+            temp_damage_output[enemy_dmg_type] = base_attack
 
         # 2. Проходим по всем типам урона в атаке
         for dmg_type, dmg_value in temp_damage_output.items():
@@ -255,7 +254,7 @@ class BattleSystem:
                 conceptual_res = defender_resistances.get('conceptual', 0)
                 if conceptual_res <= 0:
                     is_conceptual_oneshot = True
-                    total_damage = 999999  # Стирание из реальности
+                    total_damage = 999999 
                     break 
             
             # 🛡 БРОНЕПРОБИТИЕ (Зависит от типа урона)
@@ -267,7 +266,7 @@ class BattleSystem:
             elif dmg_type == 'magic':
                 effective_defense = defense * 0.5     # Магия пробивает 50% брони
             elif dmg_type in ['spiritual', 'dimensional', 'conceptual']:
-                effective_defense = 0                 # Души и Измерения игнорируют 100% брони
+                effective_defense = 0                 # Игнорируют 100% брони
 
             # Формула снижения урона: 100 брони = урон режется в 2 раза
             defense_multiplier = 100 / (100 + effective_defense)
@@ -361,7 +360,7 @@ class BattleSystem:
                 
                 # === НОВОЕ: 2. Эффекты от оружия и Вампиризм ===
                 msg += self._apply_on_hit_effects(dmg_type, True)
-                if self.vampirism_percent > 0:
+                if getattr(self, 'vampirism_percent', 0) > 0:
                     heal = max(1, int(damage * (self.vampirism_percent / 100.0)))
                     self.state.player_hp = min(self.state.player_max_hp, self.state.player_hp + heal)
                     msg += f"\n🦇 Вампиризм восстановил вам {heal} HP!"
@@ -373,9 +372,8 @@ class BattleSystem:
             if enemy_stunned:
                 round_messages.append(f"💫 {self.enemy.name} оглушен и пропускает свой супер-быстрый ход!")
             else:
-                enemy_damage = self.enemy_stats['attack']
-                resistance = self.player_resistances.get(self.enemy.damage_type, 0)
-                damage = int(enemy_damage * (1 - resistance))
+                # 🛡 ИСПРАВЛЕНИЕ 1: Моб бьет с учетом твоей брони!
+                damage, _ = self._calculate_damage(self.enemy_stats, self.player_resistances, {}, is_player=False)
                 self.state.player_hp -= damage
                 
                 log.attacker = self.enemy.name
@@ -431,9 +429,8 @@ class BattleSystem:
                         is_dodged = self._check_dodge(speed_diff, self.player_stats.speed > self.enemy_stats['speed'])
                         
                         if not is_dodged:
-                            enemy_damage = self.enemy_stats['attack']
-                            resistance = self.player_resistances.get(self.enemy.damage_type, 0)
-                            damage = int(enemy_damage * (1 - resistance))
+                            # 🛡 ИСПРАВЛЕНИЕ 2: Моб бьет с учетом твоей брони!
+                            damage, _ = self._calculate_damage(self.enemy_stats, self.player_resistances, {}, is_player=False)
                             self.state.player_hp -= damage
                             
                             msg = f"🔥 {self.enemy.name} контратакует на {damage} урона!"
@@ -452,9 +449,8 @@ class BattleSystem:
                     is_dodged = self._check_dodge(speed_diff, self.player_stats.speed > self.enemy_stats['speed'])
                     
                     if not is_dodged:
-                        enemy_damage = self.enemy_stats['attack']
-                        resistance = self.player_resistances.get(self.enemy.damage_type, 0)
-                        damage = int(enemy_damage * (1 - resistance))
+                        # 🛡 ИСПРАВЛЕНИЕ 3: Моб бьет с учетом твоей брони!
+                        damage, _ = self._calculate_damage(self.enemy_stats, self.player_resistances, {}, is_player=False)
                         self.state.player_hp -= damage
                         
                         log.attacker = self.enemy.name
@@ -637,46 +633,74 @@ class PvPBattle:
         self.p2_resistances = player2.deck.get_all_resistances()
     
     def execute_round(self) -> BattleLog:
-        """Выполнить раунд PvP"""
+        """Выполнить раунд PvP с учетом брони и вампиризма"""
         p1_speed = self.p1_stats.speed
         p2_speed = self.p2_stats.speed
         speed_diff = abs(p1_speed - p2_speed)
         
         log = BattleLog(round_num=self.state.round_num, attacker="", defender="", damage=0, damage_type="physical")
         
+        # Получаем вампиризм игроков
+        p1_vampirism = sum(int(getattr(b, "value", 0)) for i in self.player1.deck.get_all_items() if i and hasattr(i, "buffs") for b in (i.buffs if isinstance(i.buffs, list) else []) if getattr(b, "stat", "") == "vampirism")
+        p2_vampirism = sum(int(getattr(b, "value", 0)) for i in self.player2.deck.get_all_items() if i and hasattr(i, "buffs") for b in (i.buffs if isinstance(i.buffs, list) else []) if getattr(b, "stat", "") == "vampirism")
+
         # Абсолютное превосходство
         if p1_speed - p2_speed >= 100:
-            damage, _ = self._calc_pvp_damage(self.p1_stats, self.p2_resistances, self.p1_damage)
+            damage, _ = self._calc_pvp_damage(self.p1_stats, self.p2_stats, self.p2_resistances, self.p1_damage)
             self.state.enemy_hp -= damage
             log.message = f"⚡ {self.player1.first_name or 'Игрок 1'} слишком быстр! Урон: {damage}"
+            if p1_vampirism > 0:
+                heal = max(1, int(damage * (p1_vampirism / 100.0)))
+                self.state.player_hp = min(self.state.player_max_hp, self.state.player_hp + heal)
+                log.message += f"\n🦇 Вампиризм лечит на {heal} HP!"
             
         elif p2_speed - p1_speed >= 100:
-            damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_resistances, self.p2_damage)
+            damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage)
             self.state.player_hp -= damage
             log.message = f"💨 {self.player2.first_name or 'Игрок 2'} слишком быстр! Урон: {damage}"
+            if p2_vampirism > 0:
+                heal = max(1, int(damage * (p2_vampirism / 100.0)))
+                self.state.enemy_hp = min(self.state.enemy_max_hp, self.state.enemy_hp + heal)
+                log.message += f"\n🦇 Вампиризм лечит на {heal} HP!"
             
         else:
             # Обычный бой
             if p1_speed > p2_speed:
                 # Игрок 1 первый
-                damage, _ = self._calc_pvp_damage(self.p1_stats, self.p2_resistances, self.p1_damage)
+                damage, _ = self._calc_pvp_damage(self.p1_stats, self.p2_stats, self.p2_resistances, self.p1_damage)
                 self.state.enemy_hp -= damage
                 log.message = f"⚔️ {self.player1.first_name or 'Игрок 1'} наносит {damage} урона!"
+                if p1_vampirism > 0:
+                    heal = max(1, int(damage * (p1_vampirism / 100.0)))
+                    self.state.player_hp = min(self.state.player_max_hp, self.state.player_hp + heal)
+                    log.message += f" (🦇 +{heal} HP)"
                 
                 if self.state.enemy_hp > 0:
-                    damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_resistances, self.p2_damage)
+                    damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage)
                     self.state.player_hp -= damage
                     log.message += f"\n🔥 {self.player2.first_name or 'Игрок 2'} отвечает на {damage}!"
+                    if p2_vampirism > 0:
+                        heal = max(1, int(damage * (p2_vampirism / 100.0)))
+                        self.state.enemy_hp = min(self.state.enemy_max_hp, self.state.enemy_hp + heal)
+                        log.message += f" (🦇 +{heal} HP)"
             else:
                 # Игрок 2 первый
-                damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_resistances, self.p2_damage)
+                damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage)
                 self.state.player_hp -= damage
                 log.message = f"🔥 {self.player2.first_name or 'Игрок 2'} наносит {damage} урона!"
+                if p2_vampirism > 0:
+                    heal = max(1, int(damage * (p2_vampirism / 100.0)))
+                    self.state.enemy_hp = min(self.state.enemy_max_hp, self.state.enemy_hp + heal)
+                    log.message += f" (🦇 +{heal} HP)"
                 
                 if self.state.player_hp > 0:
-                    damage, _ = self._calc_pvp_damage(self.p1_stats, self.p2_resistances, self.p1_damage)
+                    damage, _ = self._calc_pvp_damage(self.p1_stats, self.p2_stats, self.p2_resistances, self.p1_damage)
                     self.state.enemy_hp -= damage
                     log.message += f"\n⚔️ {self.player1.first_name or 'Игрок 1'} отвечает на {damage}!"
+                    if p1_vampirism > 0:
+                        heal = max(1, int(damage * (p1_vampirism / 100.0)))
+                        self.state.player_hp = min(self.state.player_max_hp, self.state.player_hp + heal)
+                        log.message += f" (🦇 +{heal} HP)"
         
         # Проверяем результат
         if self.state.enemy_hp <= 0:
@@ -690,28 +714,35 @@ class PvPBattle:
         self.state.round_num += 1
         return log
     
-    def _calc_pvp_damage(self, attacker_stats: Stats, defender_resistances: Dict,
+    def _calc_pvp_damage(self, attacker_stats: Stats, defender_stats: Stats, defender_resistances: Dict,
                         damage_output: Dict) -> Tuple[int, str]:
-        """Рассчитать урон в PvP"""
+        """Рассчитать урон в PvP с учетом брони"""
+        defense = defender_stats.defense
         total_damage = 0
         
-        for dmg_type, dmg_value in damage_output.items():
+        temp_damage_output = dict(damage_output) if damage_output else {}
+        temp_damage_output['physical'] = temp_damage_output.get('physical', 0) + (attacker_stats.attack * 0.5)
+        
+        for dmg_type, dmg_value in temp_damage_output.items():
             if dmg_value <= 0:
                 continue
+                
+            effective_defense = defense
+            if dmg_type == 'physical': effective_defense = defense
+            elif dmg_type == 'energy': effective_defense = defense * 0.75
+            elif dmg_type == 'magic': effective_defense = defense * 0.5
+            else: effective_defense = 0
+            
+            defense_multiplier = 100 / (100 + effective_defense)
+            dmg_after_armor = dmg_value * defense_multiplier
+            
             resistance = defender_resistances.get(dmg_type, 0)
-            total_damage += dmg_value * (1 - resistance)
+            total_damage += dmg_after_armor * (1 - resistance)
         
-        total_damage += attacker_stats.attack * 0.5
-        
-        # Крит
-        if random.random() < 0.1:
-            total_damage *= 1.5
-        
-        # Разброс
+        if random.random() < 0.1: total_damage *= 1.5
         total_damage *= random.uniform(0.8, 1.2)
         
-        if total_damage <= 0:
-            return 0, 'physical'
+        if total_damage <= 0: return 0, 'physical'
         return max(1, int(total_damage)), 'physical'
     
     def _calculate_pvp_rewards(self, winner_is_player1: bool):
@@ -773,4 +804,5 @@ class PvPBattle:
             ui += f"\n⚔ Процесс боя:\n\n{log.message}"
             
         return ui
+
 
