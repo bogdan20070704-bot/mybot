@@ -517,3 +517,15 @@ async def classpoint_spent(callback: CallbackQuery):
     )
     await safe_edit(callback, text, main_menu_keyboard())
     await callback.answer("Характеристика улучшена!")
+
+
+@router.callback_query(F.data == "profile:marriage")
+async def profile_marriage_handler(callback: CallbackQuery):
+    """Открывает раздел семьи/брака"""
+    from handlers.marriage import cmd_marriage # Импортируем функцию показа брака
+    
+    user_id = callback.from_user.id
+    # Вызываем функцию из твоего модуля браков
+    # Мы передаем callback.message, чтобы функция отрисовала меню брака
+    await cmd_marriage(callback.message, custom_user_id=user_id)
+    await callback.answer()
