@@ -96,7 +96,6 @@ def inventory_keyboard(items: List[dict], page: int = 0, items_per_page: int = 5
     
     for item in page_items:
         item_name = item.get('name', 'Неизвестный предмет')
-        # 👇 ФИКС: Берем ID конкретного предмета в инвентаре, а не ID из базы шаблонов
         inv_id = item.get('id', item.get('item_id', ''))
         quantity = item.get('quantity', 1)
         
@@ -105,10 +104,11 @@ def inventory_keyboard(items: List[dict], page: int = 0, items_per_page: int = 5
             btn_text += f" x{quantity}"
         
         buttons.append([
-            InlineKeyboardButton(text=btn_text, callback_data=f"item:{item_id}:view")
+            # 👇 ИСПРАВЛЕНИЕ: Было item_id, должно быть inv_id!
+            InlineKeyboardButton(text=btn_text, callback_data=f"item:{inv_id}:view")
         ])
-    
-    # Навигация
+        
+    # Навигация (оставляем как есть)
     nav_buttons = []
     if page > 0:
         nav_buttons.append(InlineKeyboardButton(text="⬅️", callback_data=f"inv:page:{page-1}"))
