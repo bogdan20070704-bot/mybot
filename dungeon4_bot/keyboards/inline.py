@@ -94,7 +94,8 @@ def inventory_keyboard(items: List[dict], page: int = 0, items_per_page: int = 5
     
     for item in page_items:
         item_name = item.get('name', 'Неизвестный предмет')
-        item_id = item.get('item_id', '')
+        # 👇 ФИКС: Берем ID конкретного предмета в инвентаре, а не ID из базы шаблонов
+        inv_id = item.get('id', item.get('item_id', ''))
         quantity = item.get('quantity', 1)
         
         btn_text = f"{item_name}"
@@ -122,6 +123,38 @@ def inventory_keyboard(items: List[dict], page: int = 0, items_per_page: int = 5
         InlineKeyboardButton(text="🔙 Назад", callback_data="menu:main")
     ])
     
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def item_view_keyboard(item_inv_id: str, item_type: str, is_equipped: bool = False, is_favorite: bool = False) -> InlineKeyboardMarkup:
+    """Клавиатура действий с конкретным предметом при его просмотре"""
+    buttons = []
+
+    # Действие зависит от типа предмета
+    if item_type in ['potion', 'consumable']:
+        buttons.append([
+            InlineKeyboardButton(text="🧪 Выпить / Использовать", callback_data=f"item_action:use:{item_inv_id}")
+        ])
+    elif item_type in ['weapon', 'armor', 'artifact', 'active_skill', 'passive_skill']:
+        if is_equipped:
+            buttons.append([
+                InlineKeyboardButton(text="❌ Снять", callback_data=f"item_action:unequip:{item_inv_id}")
+            ])
+        else:
+            buttons.append([
+                InlineKeyboardButton(text="✅ Надеть", callback_data=f"item_action:equip:{item_inv_id}")
+            ])
+
+    # Избранное
+    fav_text = "❌ Из избранного" if is_favorite else "⭐ В избранное"
+    buttons.append([
+        InlineKeyboardButton(text=fav_text, callback_data=f"item_action:fav:{item_inv_id}")
+    ])
+
+    # Назад
+    buttons.append([
+        InlineKeyboardButton(text="🔙 К инвентарю", callback_data="menu:inventory")
+    ])
+
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -214,9 +247,10 @@ def profile_keyboard() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton(text="🐾 Питомец", callback_data="profile:pet"),
-            InlineKeyboardButton(text="⚙️ Настройки", callback_data="profile:settings"),
+            InlineKeyboardButton(text="💍 Семья", callback_data="profile:marriage"), # 👇 КНОПКА СЕМЬИ ЗДЕСЬ
         ],
         [
+            InlineKeyboardButton(text="⚙️ Настройки", callback_data="profile:settings"),
             InlineKeyboardButton(text="🔙 Назад", callback_data="menu:main")
         ]
     ])
@@ -250,11 +284,7 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="👤 Профиль", callback_data="menu:profile"),
-            InlineKeyboardButton(text="🏰 Подземелье", callback_data="menu:dungeon"),
-        ],
-        [
-            InlineKeyboardButton(text="🗼 Башня", callback_data="menu:tower"),
-            InlineKeyboardButton(text="⚔️ PvP", callback_data="menu:pvp"),
+            InlineKeyboardButton(text="⚔️ Бой", callback_data="menu:battle_menu"), # 👇 Сюда спрятали все бои
         ],
         [
             InlineKeyboardButton(text="🎒 Инвентарь", callback_data="menu:inventory"),
@@ -263,14 +293,29 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton(text="📊 Топ игроков", callback_data="menu:top"),
             InlineKeyboardButton(text="❓ Помощь", callback_data="menu:help"),
-        ],
-        # Добавь эту строчку в список кнопок в main_menu_keyboard()
-        [
-            InlineKeyboardButton(text="👑 Бой с Монархом", callback_data="menu:monarch")
-        ],
+        ]
     ])
     return keyboard
 
+def battle_menu_keyboard() -> InlineKeyboardMarkup:
+    """Меню выбора режима боя"""
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🏰 Подземелье", callback_data="menu:dungeon"),
+            InlineKeyboardButton(text="🗼 Башня", callback_data="menu:tower"),
+        ],
+        [
+            InlineKeyboardButton(text="⚔️ PvP Арена", callback_data="menu:pvp"),
+            InlineKeyboardButton(text="👑 Бой с Монархом", callback_data="menu:monarch"),
+        ],
+        [
+            InlineKeyboardButton(text="🤝 Кооператив", callback_data="menu:coop"), # Задел на будущее!
+        ],
+        [
+            InlineKeyboardButton(text="🔙 В главное меню", callback_data="menu:main")
+        ]
+    ])
+    return keyboard
 
 def confirm_keyboard(confirm_callback: str, cancel_callback: str) -> InlineKeyboardMarkup:
     """Клавиатура подтверждения"""
