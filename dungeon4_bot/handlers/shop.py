@@ -61,14 +61,28 @@ async def shop_category(callback: CallbackQuery):
         items = [
             {
                 "item_id": "heal_potion",
-                "name": "🧪 Зелье исцеления",
+                "name": "❤️ Зелье исцеления",
                 "description": "Восстанавливает 100% HP",
                 "price": 700,
                 "type": "consumable",
+            },
+            {
+                "item_id": "strength_potion",
+                "name": "⚔️ Зелье силы",
+                "description": "Увеличивает атаку и урон на 50% на один бой.",
+                "price": 1500,
+                "type": "consumable",
+            },
+            {
+                "item_id": "speed_potion",
+                "name": "⚡ Зелье скорости",
+                "description": "Увеличивает скорость на 50% на один бой.",
+                "price": 2000,
+                "type": "consumable",
             }
         ]
-        # 👇 ФИКС: Добавляем зелье в память магазина, чтобы бот его не забыл!
-        shop_items_cache["heal_potion"] = items[0]
+        for item in items:
+            shop_items_cache[item["item_id"]] = item
     else:
         type_map = {
             "weapon": "weapon",
@@ -199,7 +213,8 @@ async def shop_buy(callback: CallbackQuery):
         await callback.message.edit_text(
             f"✅ {hbold('Покупка совершена!')}\n\n"
             f"Вы купили: {item['name']}\n"
-            f"Осталось монет: {coins - item['price']}",
+            f"Осталось монет: {coins - item['price']}\n\n"
+            f"Зелье добавлено в ваш пояс расходников!",
             reply_markup=main_menu_keyboard(),
         )
     else:
