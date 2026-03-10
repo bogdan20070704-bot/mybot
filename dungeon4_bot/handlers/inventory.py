@@ -381,3 +381,99 @@ async def process_upgrade(callback: CallbackQuery):
         f"Осталось классовых очков: {class_points - 1}"
     )
     await callback.answer("Улучшение завершено!")
+
+
+# --- ХЭНДЛЕР ОТКРЫТИЯ ПОЯСА С ЗЕЛЬЯМИ ---
+@router.callback_query(F.data == "potions:belt")
+async def show_potions_belt(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    
+    # Достаем все расходники игрока из БД
+    async with db.connection.execute(
+        "SELECT * FROM consumables WHERE user_id = ? AND quantity > 0", 
+        (user_id,)
+    ) as cursor:
+        rows = await cursor.fetchall()
+        consumables = [dict(row) for row in rows]
+        
+    user_data = await db.get_user(user_id)
+    active_buff = user_data.get("active_potion")
+    
+    # Красивые названия для кнопок
+    potion_names = {
+        "heal_potion": "❤️ Зелье исцеления",
+        "strength_potion": "⚔️ Зелье силы",
+        "speed_potion": "⚡ Зелье скорости"
+    }
+
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    buttons = []
+    
+    if consumables:
+        for cons in consumables:
+            p_type = cons['item_type']
+            qty = cons['quantity']
+            name = potion_names.get(p_type, p_type)
+            
+            # Добавляем кнопку для каждого зелья
+            buttons.append([
+                InlineKeyboardButton(
+                    text=f"{name} (В наличии: {qty} шт.)", 
+                    callback_data=f"potions:use:{p_type}"
+                )
+            ])
+            
+    # Кнопка возврата в меню боя
+    buttons.append([InlineKeyboardButton(text="🔙 Назад к боям", callback_data="menu:battle_menu")])
+    
+    # Текст о текущем баффе
+    buff_status = f"\n\n🔥 Активный бафф: {hbold(potion_names.get(active_buff + '_potion', active_buff))} (сработает в следующем бою!)" if active_buff else "\n\n❕ У вас нет активных баффов."
+    
+    text = f"🧪 {hbold('Ваш пояс с зельями')}\n\nВыберите зелье, чтобы выпить его перед боем."
+    if not consumables:
+        text += "\n\nУ вас нет зелий. Вы можете купить их в магазине в разделе 'Расходники'."
+        
+    text += buff_status
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
+    )
+    await callback.answer()
+
+
+# --- ХЭНДЛЕР РАСПИТИЯ ЗЕЛЬЯ ---
+@router.callback_query(F.data.startswith("potions:use:"))
+async def use_potion_handler(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    potion_type = callback.data.split(":")[2] # Вытаскиваем тип зелья
+    
+    # 1. Проверяем, есть ли оно в наличии
+    async with db.connection.execute(
+        "SELECT quantity FROM consumables WHERE user_id = ? AND item_type = ?", 
+        (user_id, potion_type)
+    ) as cursor:
+        row = await cursor.fetchone()
+
+    if not row or row['quantity'] <= 0:
+        return await callback.answer("❌ У вас закончилось это зелье!", show_alert=True)
+
+    # 2. Если это хилка - предупреждаем, что её пьют внутри данжа
+    if potion_type == "heal_potion":
+        return await callback.answer("❤️ Зелье исцеления нужно использовать прямо во время боя или внутри подземелья по кнопке 'Исцелиться'!", show_alert=True)
+
+    # 3. Списываем 1 зелье из базы
+    await db.connection.execute(
+        "UPDATE consumables SET quantity = quantity - 1 WHERE user_id = ? AND item_type = ?", 
+        (user_id, potion_type)
+    )
+    
+    # 4. Устанавливаем бафф
+    buff = "strength" if "strength" in potion_type else "speed"
+    await db.set_active_potion(user_id, buff)
+    await db.connection.commit()
+
+    await callback.answer(f"🧪 Бульк! Вы выпили зелье. Бафф активирован на следующий бой!", show_alert=True)
+    
+    # 5. Обновляем интерфейс пояса (чтобы счетчик зелий обновился)
+    await show_potions_belt(callback)
