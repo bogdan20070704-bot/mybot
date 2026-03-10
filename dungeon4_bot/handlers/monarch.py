@@ -138,7 +138,19 @@ async def handle_monarch_round(callback: CallbackQuery, user_id: int, user_data:
     else:
         title_text = f"👑 ФИНАЛ: {base_monarch.name}"
 
-    battle = BattleSystem(player, enemy, run['difficulty'])
+    # === НОВОЕ: АКТИВИРУЕМ ЗЕЛЬЕ В БОЮ ===
+    active_buff = user_data.get("active_potion")
+    potions = [active_buff] if active_buff else []
+    
+    # Передаем potions в боевую систему
+    battle = BattleSystem(player, enemy, run['difficulty'], active_potions=potions)
+    
+    # Сразу сбрасываем бафф в БД, чтобы он действовал только на ОДИН раунд (одну битву)
+    if active_buff:
+        await db.clear_active_potion(user_id)
+        user_data["active_potion"] = None 
+    # ======================================
+
     battle.state.player_hp = run['current_hp']
     battle.state.player_max_hp = run['max_hp']
 
@@ -238,4 +250,5 @@ async def handle_monarch_heal(callback: CallbackQuery, user_id: int, run: dict):
 @router.callback_query(F.data == "menu:monarch")
 async def monarch_menu_callback(callback: CallbackQuery):
     await cmd_monarch(callback.message, custom_user_id=callback.from_user.id)
+
     await callback.answer()
