@@ -264,6 +264,10 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="📊 Топ игроков", callback_data="menu:top"),
             InlineKeyboardButton(text="❓ Помощь", callback_data="menu:help"),
         ],
+        # Добавь эту строчку в список кнопок в main_menu_keyboard()
+        [
+            InlineKeyboardButton(text="👑 Бой с Монархом", callback_data="menu:monarch")
+        ],
     ])
     return keyboard
 
