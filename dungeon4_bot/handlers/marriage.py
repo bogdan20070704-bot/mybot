@@ -7,6 +7,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.utils.markdown import hbold
 from datetime import datetime
 import json
+import uuid
 
 from database.models import db
 
@@ -116,52 +117,63 @@ async def accept_marriage(callback: CallbackQuery):
         (host_id, target_id, now)
     )
     
-    # 2. Выдаем уникальные кольца со ВСЕМИ полями из твоей базы
+    # 2. Выдаем уникальные кольца
     ring_name = "💍 Кольцо Истинной Любви"
     ring_desc = "Символ нерушимой связи. Дарует супругам Адаптацию к любому урону."
     
-    # Запаковываем баффы и резисты в JSON, как того требует БД
     ring_buffs = json.dumps([{"stat": "adaptation", "value": 5}])
-    ring_res = json.dumps({}) # Пустые резисты по умолчанию
+    ring_res = json.dumps({}) 
     
     try:
         for u_id in (host_id, target_id):
+            # Генерируем уникальный ID для кольца (чтобы база не ругалась на дубликаты)
+            unique_item_id = f"ring_{u_id}_{str(uuid.uuid4())[:8]}"
+            
+            # Сначала создаем шаблон кольца в таблице items
             await db.connection.execute("""
                 INSERT INTO items (
-                    user_id, name, description, item_type, rarity, level, 
+                    item_id, name, description, item_type, rarity, level, 
                     hp_bonus, attack_bonus, defense_bonus, speed_bonus, 
                     damage_type, damage_value, resistances, buffs, price
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                u_id,                  # user_id
-                ring_name,             # name
-                ring_desc,             # description (desc)
-                'artifact',            # item_type (type)
-                'legendary',           # rarity
-                1,                     # level
-                100,                   # hp_bonus (hp)
-                20,                    # attack_bonus (atk)
-                20,                    # defense_bonus (def)
-                10,                    # speed_bonus (spd)
-                'physical',            # damage_type (dmg_type)
-                0,                     # damage_value (dmg_val)
-                ring_res,              # resistances (res)
-                ring_buffs,            # buffs (buff)
-                50000                  # price
+                unique_item_id,        # 👈 ВОТ ОН, УНИКАЛЬНЫЙ ID!
+                ring_name,             
+                ring_desc,             
+                'artifact',            
+                'legendary',           
+                1,                     
+                100,                   
+                20,                    
+                20,                    
+                10,                    
+                'physical',            
+                0,                     
+                ring_res,              
+                ring_buffs,            
+                50000                  
             ))
+            
+            # А теперь самое главное: кладем это кольцо игроку в инвентарь!
+            # Без этого шага оно висит в базе шаблонов, но не у игрока.
+            await db.connection.execute("""
+                INSERT INTO inventory (user_id, item_id, item_type, quantity)
+                VALUES (?, ?, ?, ?)
+            """, (u_id, unique_item_id, 'artifact', 1))
+            
         await db.connection.commit()
     except Exception as e:
         print(f"Ошибка выдачи кольца: {e}")
         pass 
     
-    # 👇 ФИКС 1: Отвечаем Телеграму, чтобы убрать "часики" загрузки с кнопки!
+    # Отвечаем Телеграму, чтобы убрать "часики" загрузки
     await callback.answer("💍 Вы согласились!", show_alert=False)
     
     # 3. Меняем сообщение
     await callback.message.edit_text(
         f"💖 {hbold('ВЫ СКАЗАЛИ ДА!')}\n\nПоздравляем молодоженов!\n\n"
         f"🎁 Вам обоим в инвентарь добавлен уникальный артефакт: {hbold(ring_name)}! "
-        f"Не забудьте экипировать его в /deck."
+        f"Не забудьте экипировать его в /profile -> Моя колода."
     )
     
     # 4. Отправляем уведомление партнеру
@@ -216,3 +228,4 @@ async def cmd_divorce(message: Message):
     except:
 
         pass
+
