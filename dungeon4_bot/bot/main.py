@@ -29,7 +29,7 @@ from handlers import (
     start, profile, dungeon, tower, pvp, 
     inventory, shop, marketplace, top, admin, 
     guilds, referrals, daily, tournaments, quests, 
-    titles, promocodes, share, pet, friends, coop, marriage
+    titles, promocodes, share, pet, friends, coop, marriage, monarch
 )
 
 
@@ -464,5 +464,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
