@@ -8,9 +8,10 @@ from aiogram.utils.markdown import hbold
 import aiosqlite
 import logging
 
+from keyboards.inline import battle_menu_keyboard, main_menu_keyboard
 from database.models import db
 from config.settings import settings
-from keyboards.inline import difficulty_selection_keyboard, main_menu_keyboard
+from keyboards.inline import difficulty_selection_keyboard
 
 router = Router()
 
@@ -175,4 +176,20 @@ async def difficulty_selected(callback: CallbackQuery):
         reply_markup=main_menu_keyboard()
     )
     await callback.answer(f"Выбран режим: {diff_settings['name']}")
+
+@router.callback_query(F.data == "menu:battle_menu")
+async def show_battle_menu(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "⚔️ Выберите режим боя:",
+        reply_markup=battle_menu_keyboard()
+    )
+    await callback.answer()
+
+@router.callback_query(F.data == "menu:main")
+async def back_to_main_menu(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "Главное меню:",
+        reply_markup=main_menu_keyboard()
+    )
+    await callback.answer()
 
