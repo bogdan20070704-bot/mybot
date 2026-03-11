@@ -383,14 +383,18 @@ async def process_upgrade(callback: CallbackQuery):
     await callback.answer("Улучшение завершено!")
 
 
-# --- ХЭНДЛЕР ОТКРЫТИЯ ПОЯСА С ЗЕЛЬЯМИ ---
+# ==========================================
+# ======= СИСТЕМА ЗЕЛИЙ И РАСХОДНИКОВ ======
+# ==========================================
+
 @router.callback_query(F.data == "potions:belt")
 async def show_potions_belt(callback: CallbackQuery):
+    """Открывает пояс с зельями (новым сообщением, чтобы не ломать меню боя)"""
     user_id = callback.from_user.id
     
-    # Достаем все расходники игрока из БД
+    # ИСПРАВЛЕНИЕ 1: Исключаем зелье исцеления (heal_potion) из списка!
     async with db.connection.execute(
-        "SELECT * FROM consumables WHERE user_id = ? AND quantity > 0", 
+        "SELECT * FROM consumables WHERE user_id = ? AND quantity > 0 AND item_type != 'heal_potion'", 
         (user_id,)
     ) as cursor:
         rows = await cursor.fetchall()
@@ -399,9 +403,7 @@ async def show_potions_belt(callback: CallbackQuery):
     user_data = await db.get_user(user_id)
     active_buff = user_data.get("active_potion")
     
-    # Красивые названия для кнопок
     potion_names = {
-        "heal_potion": "❤️ Зелье исцеления",
         "strength_potion": "⚔️ Зелье силы",
         "speed_potion": "⚡ Зелье скорости"
     }
@@ -415,40 +417,40 @@ async def show_potions_belt(callback: CallbackQuery):
             qty = cons['quantity']
             name = potion_names.get(p_type, p_type)
             
-            # Добавляем кнопку для каждого зелья
             buttons.append([
                 InlineKeyboardButton(
-                    text=f"{name} (В наличии: {qty} шт.)", 
+                    text=f"{name} ({qty} шт.)", 
                     callback_data=f"potions:use:{p_type}"
                 )
             ])
             
-    # Кнопка возврата в меню боя
-    buttons.append([InlineKeyboardButton(text="🔙 Назад к боям", callback_data="menu:battle_menu")])
+    # ИСПРАВЛЕНИЕ 2: Кнопка закрытия мини-инвентаря
+    buttons.append([InlineKeyboardButton(text="❌ Закрыть пояс", callback_data="potions:close")])
     
-    # Текст о текущем баффе
-    buff_status = f"\n\n🔥 Активный бафф: {hbold(potion_names.get(active_buff + '_potion', active_buff))} (сработает в следующем бою!)" if active_buff else "\n\n❕ У вас нет активных баффов."
+    buff_status = f"\n\n🔥 Активный бафф: {hbold(potion_names.get(active_buff + '_potion', active_buff))} (на 1 бой)" if active_buff else "\n\n❕ Нет активных баффов."
     
-    text = f"🧪 {hbold('Ваш пояс с зельями')}\n\nВыберите зелье, чтобы выпить его перед боем."
+    text = f"🧪 {hbold('Ваш пояс с зельями (Баффы)')}\n\nВыберите зелье для усиления:"
     if not consumables:
-        text += "\n\nУ вас нет зелий. Вы можете купить их в магазине в разделе 'Расходники'."
+        text += "\n\nУ вас нет усиливающих зелий. Купите их в Магазине!"
         
     text += buff_status
+    text += "\n\n💡 <i>Зелье исцеления пьется отдельной кнопкой «❤️ Исцелиться» в меню боя.</i>"
 
-    await callback.message.edit_text(
+    # ИСПРАВЛЕНИЕ 3: Отправляем НОВЫМ сообщением (.answer вместо .edit_text)
+    await callback.message.answer(
         text,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
     )
     await callback.answer()
 
 
-# --- ХЭНДЛЕР РАСПИТИЯ ЗЕЛЬЯ ---
 @router.callback_query(F.data.startswith("potions:use:"))
 async def use_potion_handler(callback: CallbackQuery):
+    """Использование конкретного зелья"""
     user_id = callback.from_user.id
-    potion_type = callback.data.split(":")[2] # Вытаскиваем тип зелья
+    potion_type = callback.data.split(":")[2] 
     
-    # 1. Проверяем, есть ли оно в наличии
+    # 1. Проверяем наличие
     async with db.connection.execute(
         "SELECT quantity FROM consumables WHERE user_id = ? AND item_type = ?", 
         (user_id, potion_type)
@@ -458,22 +460,31 @@ async def use_potion_handler(callback: CallbackQuery):
     if not row or row['quantity'] <= 0:
         return await callback.answer("❌ У вас закончилось это зелье!", show_alert=True)
 
-    # 2. Если это хилка - предупреждаем, что её пьют внутри данжа
-    if potion_type == "heal_potion":
-        return await callback.answer("❤️ Зелье исцеления нужно использовать прямо во время боя или внутри подземелья по кнопке 'Исцелиться'!", show_alert=True)
-
-    # 3. Списываем 1 зелье из базы
+    # 2. Списываем зелье
     await db.connection.execute(
         "UPDATE consumables SET quantity = quantity - 1 WHERE user_id = ? AND item_type = ?", 
         (user_id, potion_type)
     )
     
-    # 4. Устанавливаем бафф
+    # 3. Устанавливаем бафф
     buff = "strength" if "strength" in potion_type else "speed"
     await db.set_active_potion(user_id, buff)
     await db.connection.commit()
 
-    await callback.answer(f"🧪 Бульк! Вы выпили зелье. Бафф активирован на следующий бой!", show_alert=True)
+    await callback.answer(f"🧪 Бульк! Вы выпили зелье. Бафф активирован!", show_alert=True)
     
-    # 5. Обновляем интерфейс пояса (чтобы счетчик зелий обновился)
-    await show_potions_belt(callback)
+    # 4. Удаляем сообщение с поясом (чтобы не мусорить в чате)
+    try:
+        await callback.message.delete()
+    except:
+        pass
+
+
+@router.callback_query(F.data == "potions:close")
+async def close_potions_belt(callback: CallbackQuery):
+    """Просто закрывает пояс"""
+    try:
+        await callback.message.delete()
+    except:
+        pass
+    await callback.answer()
