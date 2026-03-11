@@ -1657,9 +1657,8 @@ class Database:
         """, (user_id, quest_id, quest['objective_count']))
         await self.connection.commit()
     
-   async def get_user_quests(self, user_id: int, status: str = None) -> List[Dict]:
+    async def get_user_quests(self, user_id: int, status: str = None) -> List[Dict]:
         """Получить квесты пользователя"""
-        # 👇 ИСПРАВЛЕНИЕ ЗДЕСЬ: Добавили нужные поля в SELECT
         query = """
             SELECT uq.*, q.name, q.description, q.quest_type, q.reward_exp, 
                    q.reward_coins, q.reward_title, q.objective_type, q.objective_target, q.objective_count
@@ -1944,6 +1943,7 @@ class Database:
 
 # Глобальный объект базы данных
 db = Database()
+
 
 
 
