@@ -405,7 +405,11 @@ async def complete_dungeon(callback: CallbackQuery, user_id: int, user_data: dic
 async def dungeon_menu_callback(callback: CallbackQuery):
     """Подземелье из меню"""
     await cmd_dungeon(callback.message, custom_user_id=callback.from_user.id)
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
+
 
 
 
