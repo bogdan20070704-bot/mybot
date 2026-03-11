@@ -345,7 +345,7 @@ class BattleSystem:
             damage_type="physical"
         )
         
-        # === НОВОЕ: 1. Обработка эффектов перед ходами (Горение, Стан) ===
+        # === НОВОЕ: 1. Обработка эффектов перед ходами (Горение, Стан) === # Очищаем прошедшие эффекты
         player_stunned, p_effect_log = self._process_effects(is_player=True)
         enemy_stunned, e_effect_log = self._process_effects(is_player=False)
         
@@ -747,10 +747,10 @@ class PvPBattle:
             damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage, getattr(self.state, 'current_adaptation', 0))
             self.state.player_hp -= damage
             # Отражение урона
-            if getattr(self, 'reflect', 0) > 0:
-               refl = max(1, int(damage * (self.reflect / 100.0)))
-               self.state.enemy_hp -= refl
-               round_messages.append(f"🪞 Отражение атаки, {refl} урона во врага!")
+            if getattr(self, 'p1_reflect', 0) > 0:
+                refl = max(1, int(damage * (self.p1_reflect / 100.0)))
+                self.state.enemy_hp -= refl
+                round_messages.append(f"🪞 Отражение атаки, {refl} урона во врага!")
                 
             log.message = f"💨 {self.player2.first_name or 'Игрок 2'} слишком быстр! Урон: {damage}"
             if p2_vampirism > 0:
@@ -774,10 +774,10 @@ class PvPBattle:
                     damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage, getattr(self.state, 'current_adaptation', 0))
                     self.state.player_hp -= damage
                     # Отражение урона
-                    if getattr(self, 'reflect', 0) > 0:
-                       refl = max(1, int(damage * (self.reflect / 100.0)))
-                       self.state.enemy_hp -= refl
-                       round_messages.append(f"🪞 Отражение атаки, {refl} урона во врага!")
+                    if getattr(self, 'p1_reflect', 0) > 0:
+                        refl = max(1, int(damage * (self.p1_reflect / 100.0)))
+                        self.state.enemy_hp -= refl
+                        log.message += f"\n🪞 Отражение атаки, {refl} урона обратно!"
                         
                     log.message += f"\n🔥 {self.player2.first_name or 'Игрок 2'} отвечает на {damage}!"
                     if p2_vampirism > 0:
@@ -789,12 +789,14 @@ class PvPBattle:
                 damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage, getattr(self.state, 'current_adaptation', 0))
                 self.state.player_hp -= damage
                 # Отражение урона
-                        if getattr(self, 'reflect', 0) > 0:
-                            refl = max(1, int(damage * (self.reflect / 100.0)))
-                            self.state.enemy_hp -= refl
-                            round_messages.append(f"🪞 Отражение атаки, {refl} урона во врага!")
-                            
-                log.message = f"🔥 {self.player2.first_name or 'Игрок 2'} наносит {damage} урона!"
+                if getattr(self, 'p1_reflect', 0) > 0:
+                    refl = max(1, int(damage * (self.p1_reflect / 100.0)))
+                    self.state.enemy_hp -= refl
+                    log.message = f"🪞 Отражение атаки, {refl} урона обратно!\n"
+                else:
+                    log.message = ""
+                    
+                log.message += f"🔥 {self.player2.first_name or 'Игрок 2'} наносит {damage} урона!"
                 if p2_vampirism > 0:
                     heal = max(1, int(damage * (p2_vampirism / 100.0)))
                     self.state.enemy_hp = min(self.state.enemy_max_hp, self.state.enemy_hp + heal)
@@ -930,6 +932,7 @@ class PvPBattle:
             ui += f"\n⚔ Процесс боя:\n\n{log.message}"
             
         return ui
+
 
 
 
