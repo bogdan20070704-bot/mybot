@@ -95,20 +95,29 @@ dp.include_router(main_router)
 @dp.error()
 async def global_error_handler(event: ErrorEvent):
     """Global fallback for unhandled exceptions."""
+    # Не логируем как критическую ошибку, если это просто протухшая кнопка
+    if isinstance(event.exception, TelegramBadRequest) and "query is too old" in str(event.exception):
+        logger.warning("Ignored an old callback query.")
+        return True
+
     logger.exception("Unhandled bot exception", exc_info=event.exception)
 
     try:
         if event.update and event.update.callback_query:
-            await event.update.callback_query.answer(
-                "⚠️ Внутренняя ошибка. Попробуйте ещё раз через пару секунд.",
-                show_alert=True,
-            )
+            try:
+                await event.update.callback_query.answer(
+                    "⚠️ Внутренняя ошибка. Попробуйте ещё раз через пару секунд.",
+                    show_alert=True,
+                )
+            except TelegramBadRequest:
+                pass  # Тихо гасим ошибку, если кнопка уже недействительна
+                
         elif event.update and event.update.message:
             await event.update.message.answer(
                 "⚠️ Внутренняя ошибка. Я уже записал её в лог."
             )
-    except Exception:
-        logger.exception("Failed to send fallback error message")
+    except Exception as e:
+        logger.error(f"Failed to send fallback error message: {e}")
 
     return True
 
@@ -464,6 +473,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
