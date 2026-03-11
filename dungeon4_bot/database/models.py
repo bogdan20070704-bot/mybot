@@ -1941,8 +1941,35 @@ class Database:
         await self.connection.commit()
 
 
+    async def set_active_potion(self, user_id: int, potion_type: str):
+        """Устанавливает бафф от зелья и добавляет колонку, если её нет"""
+        try:
+            # Страховка: если мы еще не создавали колонку для баффов в БД, создаем её
+            await self.connection.execute("ALTER TABLE users ADD COLUMN active_potion TEXT")
+        except Exception:
+            pass
+            
+        await self.connection.execute(
+            "UPDATE users SET active_potion = ? WHERE user_id = ?",
+            (potion_type, user_id)
+        )
+        await self.connection.commit()
+
+    async def clear_active_potion(self, user_id: int):
+        """Сбрасывает бафф после боя"""
+        try:
+            await self.connection.execute(
+                "UPDATE users SET active_potion = NULL WHERE user_id = ?",
+                (user_id,)
+            )
+            await self.connection.commit()
+        except Exception:
+            pass
+
+
 # Глобальный объект базы данных
 db = Database()
+
 
 
 
