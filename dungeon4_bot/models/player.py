@@ -77,17 +77,42 @@ class Item:
     def from_db(cls, db_item: Dict) -> 'Item':
         """Создать предмет из данных БД"""
         buffs = []
-        buffs_data = json.loads(db_item.get('buffs', '{}'))
-        for buff_name, buff_data in buffs_data.items():
-            if isinstance(buff_data, dict):
-                buffs.append(Buff(
-                    name=buff_name,
-                    type=buff_data.get('type', 'buff'),
-                    stat=buff_data.get('stat', ''),
-                    value=buff_data.get('value', 0),
-                    is_percent=buff_data.get('is_percent', True)
-                ))
+        try:
+            # Загружаем JSON (он может быть словарем или списком)
+            buffs_data = json.loads(db_item.get('buffs', '{}'))
+        except (json.JSONDecodeError, TypeError):
+            buffs_data = {}
+            
+        # Если это словарь (старый формат)
+        if isinstance(buffs_data, dict):
+            for buff_name, buff_data in buffs_data.items():
+                if isinstance(buff_data, dict):
+                    buffs.append(Buff(
+                        name=buff_name,
+                        type=buff_data.get('type', 'buff'),
+                        stat=buff_data.get('stat', ''),
+                        value=buff_data.get('value', 0),
+                        is_percent=buff_data.get('is_percent', True)
+                    ))
+        # Если это список (новый формат, как у кольца брака)
+        elif isinstance(buffs_data, list):
+            for buff_data in buffs_data:
+                if isinstance(buff_data, dict):
+                    buffs.append(Buff(
+                        name=buff_data.get('name', 'Адаптация'), # Имя по умолчанию
+                        type=buff_data.get('type', 'buff'),
+                        stat=buff_data.get('stat', ''),
+                        value=buff_data.get('value', 0),
+                        is_percent=buff_data.get('is_percent', True)
+                    ))
         
+        # Резисты
+        try:
+            extra_data = json.loads(db_item.get('extra_data', '{}'))
+            resistances = extra_data.get('resistances', {})
+        except (json.JSONDecodeError, TypeError):
+            resistances = {}
+            
         return cls(
             item_id=db_item['item_id'],
             name=db_item['name'],
@@ -102,7 +127,7 @@ class Item:
             damage_type=db_item.get('damage_type', 'physical'),
             damage_value=db_item.get('damage_value', 0),
             buffs=buffs,
-            resistances=json.loads(db_item.get('extra_data', '{}')).get('resistances', {})
+            resistances=resistances
         )
     
     def to_card_text(self) -> str:
