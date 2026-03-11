@@ -47,14 +47,35 @@ class BattleState:
     coins_gained: int = 0
     items_dropped: List[Dict] = field(default_factory=list)
 
-    # НОВОЕ: Адаптация
+    # Адаптация
     current_adaptation: int = 0  # Для игрока (PvE) или Игрока 1 (PvP)
     enemy_adaptation: int = 0    # Для Игрока 2 (PvP)
 
 
+def _get_deck_stat(player: Player, stat_name: str) -> float:
+    """Универсальная функция для поиска любого баффа в колоде"""
+    total = 0.0
+    for item in player.deck.get_all_items():
+        if not item or not hasattr(item, "buffs") or not item.buffs:
+            continue
+        buffs = item.buffs
+        if isinstance(buffs, dict):
+            val = buffs.get(stat_name)
+            if isinstance(val, dict): total += float(val.get("value", 0))
+            elif isinstance(val, (int, float)): total += float(val)
+            continue
+        for buff in buffs:
+            if isinstance(buff, dict):
+                if (buff.get("stat") or buff.get("name")) == stat_name:
+                    total += float(buff.get("value", 0))
+                continue
+            if (getattr(buff, "stat", None) or getattr(buff, "name", None)) == stat_name:
+                total += float(getattr(buff, "value", 0))
+    return total
+
+
 class BattleSystem:
     """Система боёв"""
-    
     
     def __init__(self, player: Player, enemy: Enemy, difficulty: str = 'easy', active_potions: List[str] = None):
         self.player = player
@@ -63,21 +84,38 @@ class BattleSystem:
         
         # Получаем характеристики
         self.player_stats = player.get_total_stats()
-        
-        # Получаем урон игрока по типам
         self.player_damage = player.deck.get_damage_output()
 
-        # === НОВОЕ: ПРИМЕНЯЕМ ЭФФЕКТЫ ЗЕЛИЙ ===
+        # === ПРИМЕНЯЕМ ЭФФЕКТЫ ЗЕЛИЙ ===
         self.active_potions = active_potions or []
         if 'strength' in self.active_potions:
             self.player_stats.attack = int(self.player_stats.attack * 1.5)
-            # Увеличиваем весь урон от оружия тоже на 50%!
             for k in self.player_damage:
                 self.player_damage[k] = int(self.player_damage[k] * 1.5)
                 
         if 'speed' in self.active_potions:
             self.player_stats.speed = int(self.player_stats.speed * 1.5)
             
+        # === ЧИТАЕМ ВСЕ БАФФЫ ИЗ ИНВЕНТАРЯ ===
+        self.vampirism_percent = _get_deck_stat(player, "vampirism")
+        self.adaptation_step = _get_deck_stat(player, "adaptation")
+        self.reflect = _get_deck_stat(player, "reflect")
+        self.exp_bonus = _get_deck_stat(player, "exp_bonus")
+        self.coin_bonus = _get_deck_stat(player, "coin_bonus")
+        
+        self.crit_chance = 0.1 + (_get_deck_stat(player, "crit_chance") / 100.0)
+        self.crit_mult = 1.5 + (_get_deck_stat(player, "crit_mult") / 100.0)
+        
+        # Дебаффы врага до расчета его статов
+        enemy_atk_debuff = _get_deck_stat(player, "enemy_attack_debuff")
+        enemy_spd_debuff = _get_deck_stat(player, "enemy_speed_debuff")
+        
+        # Режем базовые статы врагу (если у нас есть дебафф-предметы)
+        if enemy_atk_debuff > 0:
+            self.enemy.base_attack = max(1, int(self.enemy.base_attack * (1 - enemy_atk_debuff/100.0)))
+        if enemy_spd_debuff > 0:
+            self.enemy.base_speed = max(1, int(self.enemy.base_speed * (1 - enemy_spd_debuff/100.0)))
+
         # Рассчитываем силу предметов игрока
         gear_score = self._calculate_gear_score()
         
@@ -100,69 +138,10 @@ class BattleSystem:
         self.player_resistances = player.deck.get_all_resistances()
         self.enemy_resistances = enemy.resistances
 
-        # НОВОЕ: Хранилища статусных эффектов
+        # Хранилища статусных эффектов
         self.player_effects = {}
         self.enemy_effects = {}
         
-        # НОВОЕ: Получаем % вампиризма из предметов игрока
-        self.vampirism_percent = self._get_vampirism_from_deck()
-
-        # === ДОБАВЛЯЕМ АДАПТАЦИЮ ===
-        self.adaptation_step = self._get_adaptation_from_deck()
-
-    def _get_adaptation_from_deck(self) -> int:
-        """Ищет бафф адаптации в экипировке"""
-        total_adapt = 0
-        for item in self.player.deck.get_all_items():
-            if not item or not hasattr(item, "buffs") or not item.buffs:
-                continue
-            buffs = item.buffs
-            
-            if isinstance(buffs, dict):
-                adapt = buffs.get("adaptation")
-                if isinstance(adapt, dict): total_adapt += int(adapt.get("value", 0))
-                elif isinstance(adapt, (int, float)): total_adapt += int(adapt)
-                continue
-                
-            for buff in buffs:
-                if isinstance(buff, dict):
-                    if (buff.get("stat") or buff.get("name")) == "adaptation":
-                        total_adapt += int(buff.get("value", 0))
-                    continue
-                if (getattr(buff, "stat", None) or getattr(buff, "name", None)) == "adaptation":
-                    total_adapt += int(getattr(buff, "value", 0))
-        return total_adapt
-
-    def _get_vampirism_from_deck(self) -> int:
-        """Ищет бафф вампиризма в экипировке"""
-        total_vamp = 0
-        for item in self.player.deck.get_all_items():
-            if not item or not hasattr(item, "buffs") or not item.buffs:
-                continue
-
-            buffs = item.buffs
-
-            # Backward compatibility for old dict-based buff payloads.
-            if isinstance(buffs, dict):
-                vamp = buffs.get("vampirism")
-                if isinstance(vamp, dict):
-                    total_vamp += int(vamp.get("value", 0))
-                elif isinstance(vamp, (int, float)):
-                    total_vamp += int(vamp)
-                continue
-
-            for buff in buffs:
-                if isinstance(buff, dict):
-                    stat = buff.get("stat") or buff.get("name")
-                    if stat == "vampirism":
-                        total_vamp += int(buff.get("value", 0))
-                    continue
-
-                buff_stat = getattr(buff, "stat", None) or getattr(buff, "name", None)
-                if buff_stat == "vampirism":
-                    total_vamp += int(getattr(buff, "value", 0))
-        return total_vamp
-
     def _process_effects(self, is_player: bool) -> Tuple[bool, str]:
         """Обрабатывает ДоТы и Стан в начале хода. Возвращает (пропуск_хода, лог_текст)"""
         effects = self.player_effects if is_player else self.enemy_effects
@@ -319,10 +298,13 @@ class BattleSystem:
             
             total_damage += resisted_damage
 
-        # 3. Криты и разброс (не работают на ваншоты)
+       # 3. Криты и разброс (с учетом баффов)
         if not is_conceptual_oneshot:
-            if random.random() < 0.1:
-                total_damage *= 1.5
+            chance = self.crit_chance if is_player else 0.1
+            mult = self.crit_mult if is_player else 1.5
+            
+            if random.random() < chance:
+                total_damage *= mult
             total_damage *= random.uniform(0.8, 1.2)
         
         # === НОВОЕ: СРЕЗАЕМ УРОН ОТ АДАПТАЦИИ ===
@@ -423,6 +405,12 @@ class BattleSystem:
                 damage, _ = self._calculate_damage(self.enemy_stats, self.player_resistances, {}, is_player=False)
                 self.state.player_hp -= damage
                 
+                # Отражение урона
+                if getattr(self, 'reflect', 0) > 0:
+                   refl = max(1, int(damage * (self.reflect / 100.0)))
+                   self.state.enemy_hp -= refl
+                   round_messages.append(f"🪞 Отражение атаки, {refl} урона во врага!")
+                
                 log.attacker = self.enemy.name
                 log.defender = self.player.first_name or "Игрок"
                 log.damage = damage
@@ -479,6 +467,11 @@ class BattleSystem:
                             # 🛡 ИСПРАВЛЕНИЕ 2: Моб бьет с учетом твоей брони!
                             damage, _ = self._calculate_damage(self.enemy_stats, self.player_resistances, {}, is_player=False)
                             self.state.player_hp -= damage
+                            # Отражение урона
+                            if getattr(self, 'reflect', 0) > 0:
+                               refl = max(1, int(damage * (self.reflect / 100.0)))
+                               self.state.enemy_hp -= refl
+                               round_messages.append(f"🪞 Отражение атаки, {refl} урона во врага!")
                             
                             msg = f"🔥 {self.enemy.name} контратакует на {damage} урона!"
                             
@@ -499,6 +492,18 @@ class BattleSystem:
                         # 🛡 ИСПРАВЛЕНИЕ 3: Моб бьет с учетом твоей брони!
                         damage, _ = self._calculate_damage(self.enemy_stats, self.player_resistances, {}, is_player=False)
                         self.state.player_hp -= damage
+                        # Отражение урона
+                        if getattr(self, 'reflect', 0) > 0:
+                           refl = max(1, int(damage * (self.reflect / 100.0)))
+                           self.state.enemy_hp -= refl
+                           round_messages.append(f"🪞 Отражение атаки, {refl} урона во врага!")
+                        
+                        # Отражение урона
+                        if getattr(self, 'reflect', 0) > 0:
+                            refl = max(1, int(damage * (self.reflect / 100.0)))
+                            self.state.enemy_hp -= refl
+                            round_messages.append(f"🪞 Шипы отразили {refl} урона во врага!")
+
                         
                         log.attacker = self.enemy.name
                         log.defender = self.player.first_name or "Игрок"
@@ -563,12 +568,17 @@ class BattleSystem:
         return log
     
     def _calculate_rewards(self):
-        """Рассчитать награды за победу"""
-        self.state.exp_gained = self.enemy.get_exp_reward(self.difficulty)
-        self.state.coins_gained = self.enemy.get_coin_reward(self.difficulty)
+        """Рассчитать награды за победу с учетом баффов"""
+        base_exp = self.enemy.get_exp_reward(self.difficulty)
+        base_coins = self.enemy.get_coin_reward(self.difficulty)
         
-        # TODO: Генерация выпавших предметов
-        # Пока заглушка
+        # Получаем баффы
+        exp_bonus = _get_deck_stat(self.player, "exp_bonus")
+        coin_bonus = _get_deck_stat(self.player, "coin_bonus")
+        
+        # Умножаем
+        self.state.exp_gained = int(base_exp * (1 + exp_bonus / 100.0))
+        self.state.coins_gained = int(base_coins * (1 + coin_bonus / 100.0))
         self.state.items_dropped = []
     
     def run_full_battle(self) -> BattleState:
@@ -681,31 +691,36 @@ class PvPBattle:
         self.p1_damage = player1.deck.get_damage_output()
         self.p2_damage = player2.deck.get_damage_output()
         
-        self.p1_resistances = player1.deck.get_all_resistances()
-        self.p2_resistances = player2.deck.get_all_resistances()
+        self.p1_adaptation_step = _get_deck_stat(player1, "adaptation")
+        self.p2_adaptation_step = _get_deck_stat(player2, "adaptation")
 
-        # === НОВОЕ: Считаем шаги адаптации для ПвП ===
-        self.p1_adaptation_step = self._get_adaptation_from_deck(player1)
-        self.p2_adaptation_step = self._get_adaptation_from_deck(player2)
+       # КРИТЫ И ОТРАЖЕНИЕ
+        self.p1_crit_chance = 0.1 + (_get_deck_stat(player1, "crit_chance") / 100.0)
+        self.p1_crit_mult = 1.5 + (_get_deck_stat(player1, "crit_mult") / 100.0)
+        self.p1_reflect = _get_deck_stat(player1, "reflect")
+        
+        self.p2_crit_chance = 0.1 + (_get_deck_stat(player2, "crit_chance") / 100.0)
+        self.p2_crit_mult = 1.5 + (_get_deck_stat(player2, "crit_mult") / 100.0)
+        self.p2_reflect = _get_deck_stat(player2, "reflect")
 
-    def _get_adaptation_from_deck(self, player: Player) -> int:
-        """Ищет бафф адаптации в экипировке игрока"""
-        total_adapt = 0
-        for item in player.deck.get_all_items():
-            if not item or not hasattr(item, "buffs") or not item.buffs: continue
-            buffs = item.buffs
-            if isinstance(buffs, dict):
-                adapt = buffs.get("adaptation")
-                if isinstance(adapt, dict): total_adapt += int(adapt.get("value", 0))
-                elif isinstance(adapt, (int, float)): total_adapt += int(adapt)
-                continue
-            for buff in buffs:
-                if isinstance(buff, dict):
-                    if (buff.get("stat") or buff.get("name")) == "adaptation": total_adapt += int(buff.get("value", 0))
-                    continue
-                if (getattr(buff, "stat", None) or getattr(buff, "name", None)) == "adaptation": total_adapt += int(getattr(buff, "value", 0))
-        return total_adapt
-    
+        # ДЕБАФФЫ ПВП
+        p1_atk_debuff = _get_deck_stat(player1, "enemy_attack_debuff")
+        p1_spd_debuff = _get_deck_stat(player1, "enemy_speed_debuff")
+        p2_atk_debuff = _get_deck_stat(player2, "enemy_attack_debuff")
+        p2_spd_debuff = _get_deck_stat(player2, "enemy_speed_debuff")
+
+        # Игрок 1 режет статы Игроку 2
+        if p1_atk_debuff > 0:
+            self.p2_stats.attack = max(1, int(self.p2_stats.attack * (1 - p1_atk_debuff/100.0)))
+        if p1_spd_debuff > 0:
+            self.p2_stats.speed = max(1, int(self.p2_stats.speed * (1 - p1_spd_debuff/100.0)))
+            
+        # Игрок 2 режет статы Игроку 1
+        if p2_atk_debuff > 0:
+            self.p1_stats.attack = max(1, int(self.p1_stats.attack * (1 - p2_atk_debuff/100.0)))
+        if p2_spd_debuff > 0:
+            self.p1_stats.speed = max(1, int(self.p1_stats.speed * (1 - p2_spd_debuff/100.0)))
+
     def execute_round(self) -> BattleLog:
         """Выполнить раунд PvP с учетом брони, вампиризма и адаптации"""
         p1_speed = self.p1_stats.speed
@@ -731,6 +746,12 @@ class PvPBattle:
         elif p2_speed - p1_speed >= 100:
             damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage, getattr(self.state, 'current_adaptation', 0))
             self.state.player_hp -= damage
+            # Отражение урона
+            if getattr(self, 'reflect', 0) > 0:
+               refl = max(1, int(damage * (self.reflect / 100.0)))
+               self.state.enemy_hp -= refl
+               round_messages.append(f"🪞 Отражение атаки, {refl} урона во врага!")
+                
             log.message = f"💨 {self.player2.first_name or 'Игрок 2'} слишком быстр! Урон: {damage}"
             if p2_vampirism > 0:
                 heal = max(1, int(damage * (p2_vampirism / 100.0)))
@@ -752,6 +773,12 @@ class PvPBattle:
                 if self.state.enemy_hp > 0:
                     damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage, getattr(self.state, 'current_adaptation', 0))
                     self.state.player_hp -= damage
+                    # Отражение урона
+                    if getattr(self, 'reflect', 0) > 0:
+                       refl = max(1, int(damage * (self.reflect / 100.0)))
+                       self.state.enemy_hp -= refl
+                       round_messages.append(f"🪞 Отражение атаки, {refl} урона во врага!")
+                        
                     log.message += f"\n🔥 {self.player2.first_name or 'Игрок 2'} отвечает на {damage}!"
                     if p2_vampirism > 0:
                         heal = max(1, int(damage * (p2_vampirism / 100.0)))
@@ -761,6 +788,12 @@ class PvPBattle:
                 # Игрок 2 первый
                 damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage, getattr(self.state, 'current_adaptation', 0))
                 self.state.player_hp -= damage
+                # Отражение урона
+                        if getattr(self, 'reflect', 0) > 0:
+                            refl = max(1, int(damage * (self.reflect / 100.0)))
+                            self.state.enemy_hp -= refl
+                            round_messages.append(f"🪞 Отражение атаки, {refl} урона во врага!")
+                            
                 log.message = f"🔥 {self.player2.first_name or 'Игрок 2'} наносит {damage} урона!"
                 if p2_vampirism > 0:
                     heal = max(1, int(damage * (p2_vampirism / 100.0)))
@@ -827,7 +860,12 @@ class PvPBattle:
             reduction = total_damage * (defender_adaptation / 100.0)
             total_damage -= reduction
         
-        if random.random() < 0.1: total_damage *= 1.5
+        # === БЛОК КРИТОВ ДЛЯ PVP ===
+        crit_chance = self.p1_crit_chance if attacker_stats == self.p1_stats else self.p2_crit_chance
+        crit_mult = self.p1_crit_mult if attacker_stats == self.p1_stats else self.p2_crit_mult
+        
+        if random.random() < crit_chance: 
+            total_damage *= crit_mult
         total_damage *= random.uniform(0.8, 1.2)
         
         if total_damage <= 0: return 0, 'physical'
@@ -892,6 +930,7 @@ class PvPBattle:
             ui += f"\n⚔ Процесс боя:\n\n{log.message}"
             
         return ui
+
 
 
 
