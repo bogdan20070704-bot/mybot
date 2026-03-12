@@ -733,30 +733,36 @@ class PvPBattle:
         p1_vampirism = sum(int(getattr(b, "value", 0)) for i in self.player1.deck.get_all_items() if i and hasattr(i, "buffs") for b in (i.buffs if isinstance(i.buffs, list) else []) if getattr(b, "stat", "") == "vampirism")
         p2_vampirism = sum(int(getattr(b, "value", 0)) for i in self.player2.deck.get_all_items() if i and hasattr(i, "buffs") for b in (i.buffs if isinstance(i.buffs, list) else []) if getattr(b, "stat", "") == "vampirism")
 
-        # Абсолютное превосходство
+        # Абсолютное превосходство в скорости
         if p1_speed - p2_speed >= 100:
             damage, _ = self._calc_pvp_damage(self.p1_stats, self.p2_stats, self.p2_resistances, self.p1_damage, getattr(self.state, 'enemy_adaptation', 0))
             self.state.enemy_hp -= damage
             log.message = f"⚡ {self.player1.first_name or 'Игрок 1'} слишком быстр! Урон: {damage}"
+            
             if p1_vampirism > 0:
                 heal = max(1, int(damage * (p1_vampirism / 100.0)))
                 self.state.player_hp = min(self.state.player_max_hp, self.state.player_hp + heal)
                 log.message += f"\n🦇 Вампиризм лечит на {heal} HP!"
+                
+            if getattr(self, 'p2_reflect', 0) > 0:
+                refl = max(1, int(damage * (self.p2_reflect / 100.0)))
+                self.state.player_hp -= refl
+                log.message += f"\n🪞 Отражение атаки, {refl} урона обратно!"
             
         elif p2_speed - p1_speed >= 100:
             damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage, getattr(self.state, 'current_adaptation', 0))
             self.state.player_hp -= damage
-            # Отражение урона
-            if getattr(self, 'p1_reflect', 0) > 0:
-                refl = max(1, int(damage * (self.p1_reflect / 100.0)))
-                self.state.enemy_hp -= refl
-                round_messages.append(f"🪞 Отражение атаки, {refl} урона во врага!")
-                
             log.message = f"💨 {self.player2.first_name or 'Игрок 2'} слишком быстр! Урон: {damage}"
+            
             if p2_vampirism > 0:
                 heal = max(1, int(damage * (p2_vampirism / 100.0)))
                 self.state.enemy_hp = min(self.state.enemy_max_hp, self.state.enemy_hp + heal)
                 log.message += f"\n🦇 Вампиризм лечит на {heal} HP!"
+
+            if getattr(self, 'p1_reflect', 0) > 0:
+               refl = max(1, int(damage * (self.p1_reflect / 100.0)))
+               self.state.enemy_hp -= refl
+               log.message += f"\n🪞 Отражение атаки, {refl} урона обратно!"
             
         else:
             # Обычный бой
@@ -765,51 +771,61 @@ class PvPBattle:
                 damage, _ = self._calc_pvp_damage(self.p1_stats, self.p2_stats, self.p2_resistances, self.p1_damage, getattr(self.state, 'enemy_adaptation', 0))
                 self.state.enemy_hp -= damage
                 log.message = f"⚔️ {self.player1.first_name or 'Игрок 1'} наносит {damage} урона!"
+                
                 if p1_vampirism > 0:
                     heal = max(1, int(damage * (p1_vampirism / 100.0)))
                     self.state.player_hp = min(self.state.player_max_hp, self.state.player_hp + heal)
                     log.message += f" (🦇 +{heal} HP)"
+                    
+                if getattr(self, 'p2_reflect', 0) > 0:
+                    refl = max(1, int(damage * (self.p2_reflect / 100.0)))
+                    self.state.player_hp -= refl
+                    log.message += f"\n🪞 Отражение атаки, {refl} урона обратно!"
                 
                 if self.state.enemy_hp > 0:
                     damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage, getattr(self.state, 'current_adaptation', 0))
                     self.state.player_hp -= damage
-                    # Отражение урона
-                    if getattr(self, 'p1_reflect', 0) > 0:
-                        refl = max(1, int(damage * (self.p1_reflect / 100.0)))
-                        self.state.enemy_hp -= refl
-                        log.message += f"\n🪞 Отражение атаки, {refl} урона обратно!"
-                        
                     log.message += f"\n🔥 {self.player2.first_name or 'Игрок 2'} отвечает на {damage}!"
+                    
                     if p2_vampirism > 0:
                         heal = max(1, int(damage * (p2_vampirism / 100.0)))
                         self.state.enemy_hp = min(self.state.enemy_max_hp, self.state.enemy_hp + heal)
                         log.message += f" (🦇 +{heal} HP)"
+
+                    if getattr(self, 'p1_reflect', 0) > 0:
+                        refl = max(1, int(damage * (self.p1_reflect / 100.0)))
+                        self.state.enemy_hp -= refl
+                        log.message += f"\n🪞 Отражение атаки, {refl} урона обратно!"
             else:
                 # Игрок 2 первый
                 damage, _ = self._calc_pvp_damage(self.p2_stats, self.p1_stats, self.p1_resistances, self.p2_damage, getattr(self.state, 'current_adaptation', 0))
                 self.state.player_hp -= damage
-                # Отражение урона
-                if getattr(self, 'p1_reflect', 0) > 0:
-                    refl = max(1, int(damage * (self.p1_reflect / 100.0)))
-                    self.state.enemy_hp -= refl
-                    log.message = f"🪞 Отражение атаки, {refl} урона обратно!\n"
-                else:
-                    log.message = ""
-                    
-                log.message += f"🔥 {self.player2.first_name or 'Игрок 2'} наносит {damage} урона!"
+                log.message = f"🔥 {self.player2.first_name or 'Игрок 2'} наносит {damage} урона!"
+                
                 if p2_vampirism > 0:
                     heal = max(1, int(damage * (p2_vampirism / 100.0)))
                     self.state.enemy_hp = min(self.state.enemy_max_hp, self.state.enemy_hp + heal)
                     log.message += f" (🦇 +{heal} HP)"
+
+                if getattr(self, 'p1_reflect', 0) > 0:
+                    refl = max(1, int(damage * (self.p1_reflect / 100.0)))
+                    self.state.enemy_hp -= refl
+                    log.message += f"\n🪞 Отражение атаки, {refl} урона обратно!"
                 
                 if self.state.player_hp > 0:
                     damage, _ = self._calc_pvp_damage(self.p1_stats, self.p2_stats, self.p2_resistances, self.p1_damage, getattr(self.state, 'enemy_adaptation', 0))
                     self.state.enemy_hp -= damage
                     log.message += f"\n⚔️ {self.player1.first_name or 'Игрок 1'} отвечает на {damage}!"
+                    
                     if p1_vampirism > 0:
                         heal = max(1, int(damage * (p1_vampirism / 100.0)))
                         self.state.player_hp = min(self.state.player_max_hp, self.state.player_hp + heal)
                         log.message += f" (🦇 +{heal} HP)"
+                    
+                    if getattr(self, 'p2_reflect', 0) > 0:
+                        refl = max(1, int(damage * (self.p2_reflect / 100.0)))
+                        self.state.player_hp -= refl
+                        log.message += f"\n🪞 Отражение атаки, {refl} урона обратно!"
         
         # Проверяем результат
         if self.state.enemy_hp <= 0:
@@ -932,6 +948,7 @@ class PvPBattle:
             ui += f"\n⚔ Процесс боя:\n\n{log.message}"
             
         return ui
+
 
 
 
