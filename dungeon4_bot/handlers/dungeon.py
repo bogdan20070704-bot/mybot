@@ -18,6 +18,8 @@ from game.dungeon import DungeonRoomType, DungeonSystem
 from keyboards.inline import dungeon_action_keyboard, main_menu_keyboard
 from models.player import Player
 from utils.helpers import generate_item_name, generate_random_item
+import asyncio
+from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -164,17 +166,38 @@ async def handle_continue(callback: CallbackQuery, user_id: int, user_data: dict
         if dungeon.advance_room():
             await db.update_dungeon(dungeon.dungeon_id, current_room=dungeon.current_room_idx + 1)
             next_room = dungeon.get_current_room()
-            await callback.message.edit_text(
+            # Формируем текст и клавиатуру заранее, чтобы код был красивым
+            text = (
                 f"🏰 {hbold('Подземелье')}\n\n"
                 f"Вы проходите в следующую комнату...\n\n"
                 f"{hbold(f'Комната {next_room.room_num}/10')}\n"
                 f"HP: {dungeon.current_hp}/{dungeon.max_hp}\n\n"
-                f"Что будете делать?",
-                reply_markup=dungeon_action_keyboard(dungeon.dungeon_id),
+                f"Что будете делать?"
             )
+            markup = dungeon_action_keyboard(dungeon.dungeon_id)
+
+            # Пытаемся обновить сообщение безопасно
+            try:
+                await callback.message.edit_text(text, reply_markup=markup)
+            except TelegramRetryAfter as e:
+                # Если Телеграм ругается на спам, ждем и пробуем еще раз
+                await asyncio.sleep(e.retry_after)
+                try:
+                    await callback.message.edit_text(text, reply_markup=markup)
+                except Exception:
+                    pass
+            except TelegramBadRequest:
+                # Игнорируем ошибку, если текст не поменялся
+                pass
+
         else:
             await complete_dungeon(callback, user_id, user_data, dungeon, success=True)
-        await callback.answer()
+            
+        try:
+            await callback.answer()
+        except Exception:
+            pass
+            
         return
 
     if not current_room.enemy:
@@ -209,7 +232,18 @@ async def handle_continue(callback: CallbackQuery, user_id: int, user_data: dict
     battle.state.player_hp = dungeon.current_hp
     battle.state.player_max_hp = dungeon.max_hp
 
+    try:
     await callback.message.edit_text(battle.get_dynamic_ui(f"🏰 {hbold('Подземелье')}"))
+except TelegramRetryAfter as e:
+    # Если Телеграм заблокировал редактирование, ждем сколько он просит
+    await asyncio.sleep(e.retry_after)
+    try:
+        await callback.message.edit_text(battle.get_dynamic_ui(f"🏰 {hbold('Подземелье')}"))
+    except Exception:
+        pass
+except TelegramBadRequest:
+    # Игнорируем ошибку, если текст сообщения не изменился (например, промах)
+    pass
 
     while battle.state.result == BattleResult.ONGOING:
         log = battle.execute_round()
@@ -409,6 +443,7 @@ async def dungeon_menu_callback(callback: CallbackQuery):
         await callback.answer()
     except Exception:
         pass
+
 
 
 
