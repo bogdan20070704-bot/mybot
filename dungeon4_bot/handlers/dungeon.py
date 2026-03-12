@@ -233,17 +233,15 @@ async def handle_continue(callback: CallbackQuery, user_id: int, user_data: dict
     battle.state.player_max_hp = dungeon.max_hp
 
     try:
-    await callback.message.edit_text(battle.get_dynamic_ui(f"🏰 {hbold('Подземелье')}"))
-except TelegramRetryAfter as e:
-    # Если Телеграм заблокировал редактирование, ждем сколько он просит
-    await asyncio.sleep(e.retry_after)
-    try:
-        await callback.message.edit_text(battle.get_dynamic_ui(f"🏰 {hbold('Подземелье')}"))
-    except Exception:
-        pass
-except TelegramBadRequest:
-    # Игнорируем ошибку, если текст сообщения не изменился (например, промах)
-    pass
+            await callback.message.edit_text(battle.get_dynamic_ui(f"🏰 {hbold('Подземелье')}"))
+        except TelegramRetryAfter as e:
+            await asyncio.sleep(e.retry_after)
+            try:
+                await callback.message.edit_text(battle.get_dynamic_ui(f"🏰 {hbold('Подземелье')}"))
+            except Exception:
+                pass
+        except TelegramBadRequest:
+            pass
 
     while battle.state.result == BattleResult.ONGOING:
         log = battle.execute_round()
@@ -443,6 +441,7 @@ async def dungeon_menu_callback(callback: CallbackQuery):
         await callback.answer()
     except Exception:
         pass
+
 
 
 
