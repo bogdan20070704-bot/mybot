@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 # Хранилище активных подземелий в памяти
 active_dungeons = {}
 
+dungeon_cooldowns = {}
 
 async def _restore_dungeon_from_db(user_id: int, user_data: dict, db_dungeon: dict):
     """Restore a dungeon run from database row."""
@@ -124,6 +125,19 @@ async def cmd_dungeon(message: Message, custom_user_id: int = None):
 async def dungeon_action(callback: CallbackQuery):
     """Обработка действий в подземелье"""
     user_id = callback.from_user.id
+    
+    # === НАЧАЛО БЛОКА КУЛДАУНА ===
+    current_time = time.time()
+    last_action_time = dungeon_cooldowns.get(user_id, 0)
+    
+    if current_time - last_action_time < 3:
+        remaining_time = int(5 - (current_time - last_action_time))
+        await callback.answer(f"⏳ Не так быстро! Подождите {remaining_time} сек.", show_alert=True)
+        return
+        
+    dungeon_cooldowns[user_id] = current_time
+    # === КОНЕЦ БЛОКА КУЛДАУНА ===
+
     data = callback.data.split(":")
 
     if len(data) < 3:
@@ -436,7 +450,21 @@ async def complete_dungeon(callback: CallbackQuery, user_id: int, user_data: dic
 @router.callback_query(F.data == "menu:dungeon")
 async def dungeon_menu_callback(callback: CallbackQuery):
     """Подземелье из меню"""
-    await cmd_dungeon(callback.message, custom_user_id=callback.from_user.id)
+    user_id = callback.from_user.id
+    
+    # === НАЧАЛО БЛОКА КУЛДАУНА ===
+    current_time = time.time()
+    last_action_time = dungeon_cooldowns.get(user_id, 0)
+    
+    if current_time - last_action_time < 5:
+        remaining_time = int(5 - (current_time - last_action_time))
+        await callback.answer(f"⏳ Готовим снаряжение... Подождите {remaining_time} сек.", show_alert=True)
+        return
+        
+    dungeon_cooldowns[user_id] = current_time
+    # === КОНЕЦ БЛОКА КУЛДАУНА ===
+
+    await cmd_dungeon(callback.message, custom_user_id=user_id)
     try:
         await callback.answer()
     except Exception:
