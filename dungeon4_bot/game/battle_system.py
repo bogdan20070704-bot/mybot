@@ -691,10 +691,15 @@ class PvPBattle:
         self.p1_damage = player1.deck.get_damage_output()
         self.p2_damage = player2.deck.get_damage_output()
         
+        # === ВОТ ТЕ САМЫЕ СТРОЧКИ, КОТОРЫХ НЕ ХВАТАЛО ===
+        self.p1_resistances = player1.deck.get_all_resistances()
+        self.p2_resistances = player2.deck.get_all_resistances()
+        # =================================================
+        
         self.p1_adaptation_step = _get_deck_stat(player1, "adaptation")
         self.p2_adaptation_step = _get_deck_stat(player2, "adaptation")
 
-       # КРИТЫ И ОТРАЖЕНИЕ
+        # КРИТЫ И ОТРАЖЕНИЕ
         self.p1_crit_chance = 0.1 + (_get_deck_stat(player1, "crit_chance") / 100.0)
         self.p1_crit_mult = 1.5 + (_get_deck_stat(player1, "crit_mult") / 100.0)
         self.p1_reflect = _get_deck_stat(player1, "reflect")
@@ -948,6 +953,7 @@ class PvPBattle:
             ui += f"\n⚔ Процесс боя:\n\n{log.message}"
             
         return ui
+
 
 
 
