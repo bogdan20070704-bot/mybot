@@ -108,8 +108,10 @@ async def item_detail(callback: CallbackQuery):
     item_slot = slot_map.get(item['item_type'], item['item_type'])
     
     buttons = [
-        # Кнопка экипировки (передаст слот и ID предмета)
+        # Кнопка экипировки
         [InlineKeyboardButton(text="🛡 Экипировать", callback_data=f"equip:{item_slot}:{item_id}")],
+        # НОВАЯ КНОПКА: Утилизация
+        [InlineKeyboardButton(text="♻️ Утилизировать (100 💰)", callback_data=f"recycle:{item_id}")],
         # Кнопка возврата к списку
         [InlineKeyboardButton(text="🔙 Назад в инвентарь", callback_data="menu:inventory")]
     ]
@@ -488,3 +490,42 @@ async def close_potions_belt(callback: CallbackQuery):
     except:
         pass
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("recycle:"))
+async def recycle_item_callback(callback: CallbackQuery):
+    """Утилизация предмета за 100 монет"""
+    user_id = callback.from_user.id
+    item_id = callback.data.split(":")[1]
+
+    # 1. Проверяем, есть ли предмет в инвентаре
+    async with db.connection.execute(
+        "SELECT id FROM inventory WHERE user_id = ? AND item_id = ?",
+        (user_id, item_id)
+    ) as cursor:
+        item_exists = await cursor.fetchone()
+
+    if not item_exists:
+        return await callback.answer("❌ Предмет не найден или уже утилизирован!", show_alert=True)
+
+    # 2. Удаляем предмет из инвентаря
+    await db.connection.execute(
+        "DELETE FROM inventory WHERE user_id = ? AND item_id = ?",
+        (user_id, item_id)
+    )
+    
+    # 3. Удаляем сам предмет из базы (чтобы не копился мусор в БД)
+    await db.connection.execute(
+        "DELETE FROM items WHERE item_id = ?",
+        (item_id,)
+    )
+
+    # 4. Начисляем 100 монет
+    await db.add_coins(user_id, 100)
+    await db.connection.commit()
+
+    # 5. Уведомляем игрока
+    await callback.answer("♻️ Вы утилизировали предмет и получили 100 💰!", show_alert=True)
+
+    # 6. Возвращаем игрока обратно в список инвентаря
+    await cmd_inventory(callback.message, custom_user_id=user_id)
