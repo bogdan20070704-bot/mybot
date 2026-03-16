@@ -538,3 +538,29 @@ async def profile_marriage_handler(callback: CallbackQuery):
         
     # show_alert=True покажет красивое окошко прямо по центру экрана
     await callback.answer(text, show_alert=True)
+
+@router.callback_query(F.data == "menu:main")
+async def back_to_main_menu_callback(callback: CallbackQuery):
+    """Возврат в главное меню по кнопке Назад"""
+    user_data = await db.get_user(callback.from_user.id)
+    if not user_data:
+        await callback.answer("Ошибка!", show_alert=True)
+        return
+
+    text = (
+        f"🏰 {hbold('Главное меню')}\n\n"
+        f"Добро пожаловать, {hbold(user_data.get('first_name') or 'Игрок')}!\n"
+        f"Выберите, куда хотите отправиться:"
+    )
+    
+    # Пытаемся безопасно заменить сообщение на главное меню
+    try:
+        if callback.message.photo:
+            await callback.message.delete()
+            await callback.message.answer(text, reply_markup=main_menu_keyboard())
+        else:
+            await callback.message.edit_text(text, reply_markup=main_menu_keyboard())
+    except Exception as e:
+        logger.error(f"Failed to return to main menu: {e}")
+        
+    await callback.answer()
