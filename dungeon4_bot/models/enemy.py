@@ -4,7 +4,10 @@
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 from config.settings import settings
+import json
+import os
 
+CUSTOM_ENEMIES_FILE = "custom_enemies.json"
 
 @dataclass
 class Enemy:
@@ -399,3 +402,48 @@ def get_monarch(rank_level: int) -> Optional[Enemy]:
     }
     enemy_id = monarch_map.get(rank_level)
     return ENEMIES_DB.get(enemy_id) if enemy_id else None
+
+
+def save_custom_enemies():
+    """Сохраняет админских врагов в файл"""
+    # Сохраняем только тех, кто начинается на 'custom_' (чтобы не перезаписывать базу)
+    custom_enemies = {k: v for k, v in ENEMIES_DB.items() if k.startswith('custom_')}
+    
+    data_to_save = {}
+    for e_id, enemy in custom_enemies.items():
+        data_to_save[e_id] = {
+            "enemy_id": enemy.enemy_id,
+            "name": enemy.name,
+            "description": enemy.description,
+            "enemy_type": enemy.enemy_type,
+            "min_level": enemy.min_level,
+            "base_hp": enemy.base_hp,
+            "base_attack": enemy.base_attack,
+            "base_speed": enemy.base_speed,
+            "base_defense": enemy.base_defense,
+            "damage_type": enemy.damage_type,
+            "resistances": enemy.resistances,
+            "exp_reward": enemy.exp_reward,
+            "coin_reward": enemy.coin_reward
+        }
+        
+    with open(CUSTOM_ENEMIES_FILE, "w", encoding="utf-8") as f:
+        json.dump(data_to_save, f, ensure_ascii=False, indent=4)
+
+def load_custom_enemies():
+    """Загружает админских врагов из файла при запуске бота"""
+    if not os.path.exists(CUSTOM_ENEMIES_FILE):
+        return
+        
+    try:
+        with open(CUSTOM_ENEMIES_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        for e_id, e_data in data.items():
+            ENEMIES_DB[e_id] = Enemy(**e_data)
+        print(f"✅ Загружено {len(data)} кастомных врагов из файла.")
+    except Exception as e:
+        print(f"❌ Ошибка при загрузке кастомных врагов: {e}")
+
+# Запускаем загрузку сразу при импорте файла!
+load_custom_enemies()
