@@ -103,6 +103,33 @@ async def shop_category(callback: CallbackQuery):
             items.append(item)
             shop_items_cache[item["item_id"]] = item
 
+        # === НОВОЕ: Добавляем кастомные предметы из базы ===
+        import json
+        db_types = [item_type] if category != "skill" else ["active_skill", "passive_skill"]
+        placeholders = ",".join("?" for _ in db_types)
+        
+        async with db.connection.execute(
+            f"SELECT * FROM items WHERE item_id LIKE 'custom_%' AND buy_price > 0 AND item_type IN ({placeholders})",
+            db_types
+        ) as cursor:
+            custom_rows = await cursor.fetchall()
+            
+        for row in custom_rows:
+            c_item = dict(row)
+            # Распаковываем JSON-строки из БД обратно в словари
+            if isinstance(c_item.get('buffs'), str):
+                try: c_item['buffs'] = json.loads(c_item['buffs'])
+                except: c_item['buffs'] = {}
+            if isinstance(c_item.get('resistances'), str):
+                try: c_item['resistances'] = json.loads(c_item['resistances'])
+                except: c_item['resistances'] = {}
+                
+            c_item["type"] = "custom_item"
+            c_item["price"] = c_item["buy_price"]
+            items.append(c_item)
+            shop_items_cache[c_item["item_id"]] = c_item
+        # ===================================================
+
     if not items:
         await callback.answer("Товары не найдены!")
         return
@@ -150,6 +177,11 @@ async def shop_view_item(callback: CallbackQuery):
             f"{item['description']}\n\n"
             f"💰 Цена: {item['price']}"
         )
+    # === НОВОЕ: Отображение кастомного предмета ===
+    elif item.get("type") == "custom_item":
+        item_obj = Item.from_db(item)
+        item_text = item_obj.to_card_text() + f"\n\n💰 Цена: {item['price']}"
+    # ==============================================
     else:
         item_obj = Item(
             item_id=item["item_id"],
@@ -217,7 +249,22 @@ async def shop_buy(callback: CallbackQuery):
             f"Зелье добавлено в ваш пояс расходников!",
             reply_markup=main_menu_keyboard(),
         )
+    # === НОВОЕ: Покупка админских (кастомных) предметов ===
+    elif item.get("type") == "custom_item":
+        # Предмет уже есть в базе данных items, поэтому мы его НЕ пересоздаем,
+        # а просто добавляем связь в инвентарь (копию предмета)
+        await db.add_item_to_inventory(user_id, item["item_id"])
+
+        await callback.message.edit_text(
+            f"✅ {hbold('Покупка совершена!')}\n\n"
+            f"✨ Вы приобрели уникальный предмет: {item['name']}\n"
+            f"Осталось монет: {coins - item['price']}\n\n"
+            f"Предмет добавлен в инвентарь!",
+            reply_markup=main_menu_keyboard(),
+        )
+    # ======================================================
     else:
+        # Стандартная покупка случайно сгенерированных предметов
         await db.create_item(**item)
         await db.add_item_to_inventory(user_id, item["item_id"])
 
