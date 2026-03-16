@@ -240,11 +240,13 @@ class BattleSystem:
         Рассчитать урон с учетом Брони, Пробивания и Концептуальных Ваншотов
         Возвращает (damage, damage_type_used)
         """
-        # 1. Определяем защиту цели (defense)
+        # 1. Определяем защиту (defense) и максимальное здоровье цели
         if is_player:
             defense = self.enemy_stats.get('defense', 0) if isinstance(self.enemy_stats, dict) else getattr(self.enemy_stats, 'defense', 0)
+            target_max_hp = self.state.enemy_max_hp
         else:
             defense = self.player_stats.get('defense', 0) if isinstance(self.player_stats, dict) else getattr(self.player_stats, 'defense', 0)
+            target_max_hp = self.state.player_max_hp
 
         total_damage = 0
         damage_type_used = 'physical'
@@ -274,7 +276,8 @@ class BattleSystem:
                 conceptual_res = defender_resistances.get('conceptual', 0)
                 if conceptual_res <= 0:
                     is_conceptual_oneshot = True
-                    total_damage = 999999 
+                    # Наносим ровно столько урона, сколько у цели Макс.ХП + Броня
+                    total_damage = target_max_hp + defense 
                     break 
             
             # 🛡 БРОНЕПРОБИТИЕ (Зависит от типа урона)
@@ -298,7 +301,7 @@ class BattleSystem:
             
             total_damage += resisted_damage
 
-       # 3. Криты и разброс (с учетом баффов)
+        # 3. Криты и разброс (с учетом баффов)
         if not is_conceptual_oneshot:
             chance = self.crit_chance if is_player else 0.1
             mult = self.crit_mult if is_player else 1.5
@@ -308,8 +311,8 @@ class BattleSystem:
             total_damage *= random.uniform(0.8, 1.2)
         
         # === НОВОЕ: СРЕЗАЕМ УРОН ОТ АДАПТАЦИИ ===
-        # Если бьет враг, и у нас есть накопленная адаптация, режем урон!
-        if not is_player and getattr(self.state, 'current_adaptation', 0) > 0:
+        # Концептуальный ваншот игнорирует адаптацию, чтобы моб точно умер
+        if not is_conceptual_oneshot and not is_player and getattr(self.state, 'current_adaptation', 0) > 0:
             reduction = total_damage * (self.state.current_adaptation / 100.0)
             total_damage -= reduction
         
