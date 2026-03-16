@@ -12,6 +12,8 @@ from aiogram.utils.markdown import hbold
 from config.settings import settings
 from database.models import db
 from models.enemy import ENEMIES_DB, Enemy
+from models.enemy import save_custom_enemies
+from models.enemy import ENEMIES_DB, Enemy, save_custom_enemies
 from utils.helpers import generate_item_name, generate_random_item
 
 router = Router()
@@ -249,6 +251,10 @@ async def cmd_enemy_create(message: Message):
             await message.answer("❌ Ошибка: параметр 'id' обязателен!")
             return
 
+        # === НОВОЕ: Автоматически добавляем префикс, чтобы бот знал, кого сохранять ===
+        if not enemy_id.startswith("custom_"):
+            enemy_id = f"custom_{enemy_id}"
+
         if enemy_id in ENEMIES_DB:
             await message.answer(f"❌ Враг с id '{enemy_id}' уже существует!")
             return
@@ -281,6 +287,11 @@ async def cmd_enemy_create(message: Message):
 
         ENEMIES_DB[enemy_id] = new_enemy
 
+        # === НОВОЕ: СОХРАНЯЕМ В ФАЙЛ ===
+        from models.enemy import save_custom_enemies
+        save_custom_enemies()
+        # ===============================
+
         res_text = (
             "\n".join([f"• {k}: {v * 100:.0f}%" for k, v in resistances.items()])
             if resistances
@@ -288,13 +299,12 @@ async def cmd_enemy_create(message: Message):
         )
 
         await message.answer(
-            f"✅ {hbold('Враг успешно внедрен в игру!')}\n\n"
+            f"✅ {hbold('Враг успешно внедрен в игру И СОХРАНЕН НАВСЕГДА!')}\n\n"
             f"🆔 ID: {enemy_id}\n"
             f"👹 Имя: {new_enemy.name} ({new_enemy.enemy_type})\n"
             f"🎯 Мин. уровень: {new_enemy.min_level}\n"
             f"❤️ HP: {new_enemy.base_hp} | ⚔️ Атака: {new_enemy.base_attack}\n"
-            f"🛡 Резисты:\n{res_text}\n\n"
-            f"⚠️ {hbold('ВАЖНО:')} Этот враг исчезнет после перезагрузки бота!"
+            f"🛡 Резисты:\n{res_text}"
         )
     except Exception as exc:
         await message.answer(f"❌ Ошибка при создании (проверьте формат цифр):\n{exc}")
@@ -315,7 +325,12 @@ async def cmd_enemy_delete(message: Message):
     if enemy_id in ENEMIES_DB:
         name = ENEMIES_DB[enemy_id].name
         del ENEMIES_DB[enemy_id]
-        await message.answer(f"✅ Враг {hbold(name)} (ID: {enemy_id}) удален.")
+        
+        # === НОВОЕ: ОБНОВЛЯЕМ ФАЙЛ ===
+        save_custom_enemies()
+        # =============================
+        
+        await message.answer(f"✅ Враг {hbold(name)} (ID: {enemy_id}) удален навсегда.")
     else:
         await message.answer(f"❌ Враг с ID '{enemy_id}' не найден!")
 
