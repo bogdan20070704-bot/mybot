@@ -130,9 +130,8 @@ async def dungeon_action(callback: CallbackQuery):
     current_time = time.time()
     last_action_time = dungeon_cooldowns.get(user_id, 0)
     
-    if current_time - last_action_time < 3:
-        remaining_time = int(5 - (current_time - last_action_time))
-        await callback.answer(f"⏳ Не так быстро! Подождите {remaining_time} сек.", show_alert=True)
+    if current_time - last_action_time < 1:
+        await callback.answer("⏳ Не так быстро! Подождите 1 сек.", show_alert=True)
         return
         
     dungeon_cooldowns[user_id] = current_time
@@ -456,9 +455,8 @@ async def dungeon_menu_callback(callback: CallbackQuery):
     current_time = time.time()
     last_action_time = dungeon_cooldowns.get(user_id, 0)
     
-    if current_time - last_action_time < 5:
-        remaining_time = int(5 - (current_time - last_action_time))
-        await callback.answer(f"⏳ Готовим снаряжение... Подождите {remaining_time} сек.", show_alert=True)
+    if current_time - last_action_time < 1:
+        await callback.answer("⏳ Готовим снаряжение... Подождите 1 сек.", show_alert=True)
         return
         
     dungeon_cooldowns[user_id] = current_time
