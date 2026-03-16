@@ -1,10 +1,12 @@
 """
 Обработчик рейтингов
 """
+import html
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
 from aiogram.utils.markdown import hbold
+from aiogram.exceptions import TelegramBadRequest
 
 from database.models import db
 from keyboards.inline import top_keyboard, main_menu_keyboard
@@ -55,10 +57,15 @@ async def show_top_levels(callback: CallbackQuery):
     
     for i, row in enumerate(top, 1):
         user = dict(row)
-        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        raw_name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        name = html.escape(raw_name) # Очищаем ник от HTML-тегов
         text += f"{i}. {name} - Lv.{user.get('level', 1)} ({user.get('exp', 0)} exp)\n"
     
-    await callback.message.edit_text(text, reply_markup=top_keyboard())
+    try:
+        await callback.message.edit_text(text, reply_markup=top_keyboard())
+    except TelegramBadRequest:
+        pass # Игнорируем ошибку двойного клика
+        
     await callback.answer()
 
 
@@ -70,10 +77,15 @@ async def show_top_coins(callback: CallbackQuery):
     
     for i, row in enumerate(top, 1):
         user = dict(row)
-        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        raw_name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        name = html.escape(raw_name)
         text += f"{i}. {name} - {user.get('coins', 0)}💰\n"
     
-    await callback.message.edit_text(text, reply_markup=top_keyboard())
+    try:
+        await callback.message.edit_text(text, reply_markup=top_keyboard())
+    except TelegramBadRequest:
+        pass
+        
     await callback.answer()
 
 
@@ -85,10 +97,15 @@ async def show_top_dungeons(callback: CallbackQuery):
     
     for i, row in enumerate(top, 1):
         user = dict(row)
-        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        raw_name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        name = html.escape(raw_name)
         text += f"{i}. {name} - {user.get('dungeons_cleared', 0)} подземелий\n"
     
-    await callback.message.edit_text(text, reply_markup=top_keyboard())
+    try:
+        await callback.message.edit_text(text, reply_markup=top_keyboard())
+    except TelegramBadRequest:
+        pass
+        
     await callback.answer()
 
 
@@ -103,10 +120,15 @@ async def show_top_towers(callback: CallbackQuery):
     
     for i, row in enumerate(rows, 1):
         user = dict(row)
-        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        raw_name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        name = html.escape(raw_name)
         text += f"{i}. {name} - {user.get('towers_cleared', 0)} башен\n"
     
-    await callback.message.edit_text(text, reply_markup=top_keyboard())
+    try:
+        await callback.message.edit_text(text, reply_markup=top_keyboard())
+    except TelegramBadRequest:
+        pass
+        
     await callback.answer()
 
 
@@ -118,7 +140,8 @@ async def show_top_pvp(callback: CallbackQuery):
     
     for i, row in enumerate(top, 1):
         user = dict(row)
-        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        raw_name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        name = html.escape(raw_name)
         wins = user.get('pvp_wins', 0)
         losses = user.get('pvp_losses', 0)
         
@@ -127,7 +150,11 @@ async def show_top_pvp(callback: CallbackQuery):
         
         text += f"{i}. {name} - {wins}W/{losses}L ({win_rate:.1f}%)\n"
     
-    await callback.message.edit_text(text, reply_markup=top_keyboard())
+    try:
+        await callback.message.edit_text(text, reply_markup=top_keyboard())
+    except TelegramBadRequest:
+        pass
+        
     await callback.answer()
 
 
@@ -148,10 +175,15 @@ async def show_top_cards(callback: CallbackQuery):
     
     for i, row in enumerate(rows, 1):
         user = dict(row)
-        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        raw_name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        name = html.escape(raw_name)
         text += f"{i}. {name} - {user.get('card_count', 0)} карт\n"
     
-    await callback.message.edit_text(text, reply_markup=top_keyboard())
+    try:
+        await callback.message.edit_text(text, reply_markup=top_keyboard())
+    except TelegramBadRequest:
+        pass
+        
     await callback.answer()
 
 
@@ -164,7 +196,8 @@ async def cmd_topcoin(message: Message):
     
     for i, row in enumerate(top, 1):
         user = dict(row)
-        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        raw_name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        name = html.escape(raw_name)
         text += f"{i}. {name} - {user.get('coins', 0)}💰\n"
     
     await message.answer(text)
@@ -179,7 +212,8 @@ async def cmd_toppvp(message: Message):
     
     for i, row in enumerate(top, 1):
         user = dict(row)
-        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        raw_name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        name = html.escape(raw_name)
         wins = user.get('pvp_wins', 0)
         losses = user.get('pvp_losses', 0)
         text += f"{i}. {name} - {wins}W/{losses}L\n"
