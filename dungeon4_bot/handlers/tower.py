@@ -349,6 +349,11 @@ async def complete_tower(callback: CallbackQuery, user_id: int, user_data: dict,
     try:
         if success:
             rewards = TowerSystem.get_tower_clear_rewards(tower.difficulty)
+            
+            # === ИЗМЕНЕНИЕ: Принудительно ставим 1 классовое очко ===
+            rewards["class_points"] = 1
+            # ========================================================
+            
             loot_text = ""
 
             await db.add_exp(user_id, rewards["exp"])
