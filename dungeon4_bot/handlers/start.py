@@ -187,9 +187,19 @@ async def show_battle_menu(callback: CallbackQuery):
 
 @router.callback_query(F.data == "menu:main")
 async def back_to_main_menu(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "Главное меню:",
-        reply_markup=main_menu_keyboard()
+    text = (
+        f"🏰 {hbold('Главное меню')}\n\n"
+        f"Добро пожаловать!\n"
+        f"Выберите, куда хотите отправиться:"
     )
+    
+    try:
+        if callback.message.photo:
+            await callback.message.delete()
+            await callback.message.answer(text, reply_markup=main_menu_keyboard())
+        else:
+            await callback.message.edit_text(text, reply_markup=main_menu_keyboard())
+    except Exception:
+        pass
+        
     await callback.answer()
-
