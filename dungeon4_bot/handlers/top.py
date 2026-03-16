@@ -157,7 +157,7 @@ async def show_top_cards(callback: CallbackQuery):
 
 # Fixed override: ensure sqlite rows are converted to dicts before `.get(...)`.
 async def show_top_cards(callback: CallbackQuery):
-    """РўРѕРї РїРѕ РєР°СЂС‚Р°Рј"""
+    """Топ по картам"""
     async with db.connection.execute(
         """SELECT u.user_id, u.username, u.first_name, COUNT(i.id) as card_count 
            FROM users u 
@@ -168,17 +168,16 @@ async def show_top_cards(callback: CallbackQuery):
            LIMIT 10"""
     ) as cursor:
         rows = await cursor.fetchall()
-
-    text = f"рџЋґ {hbold('РўРѕРї РїРѕ РєРѕР»РёС‡РµСЃС‚РІСѓ РєР°СЂС‚')}\n\n"
-
+    
+    text = f"🎴 {hbold('Топ по количеству карт')}\n\n"
+    
     for i, row in enumerate(rows, 1):
         user = dict(row)
-        name = user.get('first_name') or user.get('username') or f"РРіСЂРѕРє {user.get('user_id')}"
-        text += f"{i}. {name} - {user.get('card_count', 0)} РєР°СЂС‚\n"
-
+        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', 'Неизвестный')}"
+        text += f"{i}. {name} - {user.get('card_count', 0)} карт\n"
+    
     await callback.message.edit_text(text, reply_markup=top_keyboard())
     await callback.answer()
-
 
 async def show_top_levels(callback: CallbackQuery):
     """Топ по уровню"""
