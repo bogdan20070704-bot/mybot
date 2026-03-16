@@ -519,27 +519,38 @@ async def generate_next_coop_room(party_id: str, bot):
         party["total_exp"] += battle_state.exp_gained
         party["total_coins"] += battle_state.coins_gained
         
-        # === ИСПРАВЛЕНИЕ: ПРОВЕРКА НА 10-Ю КОМНАТУ ДАНЖА ===
-        if mode == "dungeon" and floor == 10:
+        # === ИСПРАВЛЕНИЕ: ПРОВЕРКА НА ПОСЛЕДНЮЮ КОМНАТУ/ЭТАЖ ===
+        is_dungeon_completed = (mode == "dungeon" and floor == 10)
+        is_tower_completed = (mode == "tower" and floor == 100)
+
+        if is_dungeon_completed or is_tower_completed:
             # Считаем лут (делим на двоих) и даем бонус за полное прохождение
-            clear_bonus_exp = 500
+            clear_bonus_exp = 500 if is_dungeon_completed else 5000  # За башню бонус больше!
             exp_each = (party["total_exp"] // 2) + clear_bonus_exp
             coins_each = party["total_coins"] // 2
             
-            # Выдаем награды обоим игрокам
+            # Выдаем награды обоим игрокам и обновляем статистику
             await db.add_exp(party["player1"], exp_each)
             await db.add_coins(party["player1"], coins_each)
-            await db.update_user(party["player1"], dungeons_cleared=p1_data.get("dungeons_cleared", 0) + 1)
+            if is_dungeon_completed:
+                await db.update_user(party["player1"], dungeons_cleared=p1_data.get("dungeons_cleared", 0) + 1)
+            else:
+                await db.update_user(party["player1"], towers_cleared=p1_data.get("towers_cleared", 0) + 1)
             
             await db.add_exp(party["player2"], exp_each)
             await db.add_coins(party["player2"], coins_each)
-            await db.update_user(party["player2"], dungeons_cleared=p2_data.get("dungeons_cleared", 0) + 1)
+            if is_dungeon_completed:
+                await db.update_user(party["player2"], dungeons_cleared=p2_data.get("dungeons_cleared", 0) + 1)
+            else:
+                await db.update_user(party["player2"], towers_cleared=p2_data.get("towers_cleared", 0) + 1)
+            
+            mode_name = "ПОДЗЕМЕЛЬЕ" if is_dungeon_completed else "БАШНЯ"
             
             win_text = (
                 f"{title}\n\n"
                 f"{battle_log}\n"
-                f"🏆 {hbold('ПОДЗЕМЕЛЬЕ ПРОЙДЕНО!')}\n\n"
-                f"Вы одолели финального босса и зачистили подземелье!\n\n"
+                f"🏆 {hbold(f'{mode_name} ПРОЙДЕНА!')}\n\n"
+                f"Вы одолели финального босса и зачистили локацию!\n\n"
                 f"🎁 Ваша доля (включая бонус за зачистку):\n"
                 f"⭐ Опыт: +{exp_each}\n"
                 f"💰 Монеты: +{coins_each}\n\n"
