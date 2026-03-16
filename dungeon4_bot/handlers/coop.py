@@ -518,6 +518,44 @@ async def generate_next_coop_room(party_id: str, bot):
     if battle_state.result == BattleResult.VICTORY:
         party["total_exp"] += battle_state.exp_gained
         party["total_coins"] += battle_state.coins_gained
+        
+        # === ИСПРАВЛЕНИЕ: ПРОВЕРКА НА 10-Ю КОМНАТУ ДАНЖА ===
+        if mode == "dungeon" and floor == 10:
+            # Считаем лут (делим на двоих) и даем бонус за полное прохождение
+            clear_bonus_exp = 500
+            exp_each = (party["total_exp"] // 2) + clear_bonus_exp
+            coins_each = party["total_coins"] // 2
+            
+            # Выдаем награды обоим игрокам
+            await db.add_exp(party["player1"], exp_each)
+            await db.add_coins(party["player1"], coins_each)
+            await db.update_user(party["player1"], dungeons_cleared=p1_data.get("dungeons_cleared", 0) + 1)
+            
+            await db.add_exp(party["player2"], exp_each)
+            await db.add_coins(party["player2"], coins_each)
+            await db.update_user(party["player2"], dungeons_cleared=p2_data.get("dungeons_cleared", 0) + 1)
+            
+            win_text = (
+                f"{title}\n\n"
+                f"{battle_log}\n"
+                f"🏆 {hbold('ПОДЗЕМЕЛЬЕ ПРОЙДЕНО!')}\n\n"
+                f"Вы одолели финального босса и зачистили подземелье!\n\n"
+                f"🎁 Ваша доля (включая бонус за зачистку):\n"
+                f"⭐ Опыт: +{exp_each}\n"
+                f"💰 Монеты: +{coins_each}\n\n"
+                f"Отличная командная работа!"
+            )
+            
+            markup = InlineKeyboardMarkup(
+                inline_keyboard=[[InlineKeyboardButton(text="🔙 В главное меню", callback_data="menu:main")]]
+            )
+            
+            await _safe_edit(bot, party["player1"], party["msg1_id"], win_text, reply_markup=markup)
+            await _safe_edit(bot, party["player2"], party["msg2_id"], win_text, reply_markup=markup)
+            _drop_party(party_id)
+            return
+        # ==================================================
+
         party["floor"] += 1
 
         win_text = (
