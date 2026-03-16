@@ -53,9 +53,10 @@ async def show_top_levels(callback: CallbackQuery):
     
     text = f"📊 {hbold('Топ по уровню')}\n\n"
     
-    for i, user in enumerate(top, 1):
-        name = user.get('first_name') or user.get('username') or f"Игрок {user['user_id']}"
-        text += f"{i}. {name} - Lv.{user['level']} ({user['exp']} exp)\n"
+    for i, row in enumerate(top, 1):
+        user = dict(row)
+        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        text += f"{i}. {name} - Lv.{user.get('level', 1)} ({user.get('exp', 0)} exp)\n"
     
     await callback.message.edit_text(text, reply_markup=top_keyboard())
     await callback.answer()
@@ -67,9 +68,10 @@ async def show_top_coins(callback: CallbackQuery):
     
     text = f"💰 {hbold('Топ по монетам')}\n\n"
     
-    for i, user in enumerate(top, 1):
-        name = user.get('first_name') or user.get('username') or f"Игрок {user['user_id']}"
-        text += f"{i}. {name} - {user['coins']}💰\n"
+    for i, row in enumerate(top, 1):
+        user = dict(row)
+        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        text += f"{i}. {name} - {user.get('coins', 0)}💰\n"
     
     await callback.message.edit_text(text, reply_markup=top_keyboard())
     await callback.answer()
@@ -82,10 +84,9 @@ async def show_top_dungeons(callback: CallbackQuery):
     text = f"🏰 {hbold('Топ по подземельям')}\n\n"
     
     for i, row in enumerate(top, 1):
-        # 👇 ФИКС: Словарь!
         user = dict(row)
-        name = user.get('first_name') or user.get('username') or f"Игрок {user['user_id']}"
-        text += f"{i}. {name} - {user['dungeons_cleared']} подземелий\n"
+        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        text += f"{i}. {name} - {user.get('dungeons_cleared', 0)} подземелий\n"
     
     await callback.message.edit_text(text, reply_markup=top_keyboard())
     await callback.answer()
@@ -101,13 +102,13 @@ async def show_top_towers(callback: CallbackQuery):
     text = f"🗼 {hbold('Топ по башням')}\n\n"
     
     for i, row in enumerate(rows, 1):
-        # 👇 ФИКС: Превращаем строку БД в питоновский словарь!
         user = dict(row)
-        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id')}"
+        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
         text += f"{i}. {name} - {user.get('towers_cleared', 0)} башен\n"
     
     await callback.message.edit_text(text, reply_markup=top_keyboard())
     await callback.answer()
+
 
 async def show_top_pvp(callback: CallbackQuery):
     """Топ по PvP"""
@@ -116,13 +117,11 @@ async def show_top_pvp(callback: CallbackQuery):
     text = f"⚔️ {hbold('Топ по PvP')}\n\n"
     
     for i, row in enumerate(top, 1):
-        # 👇 ФИКС: Делаем словарь
         user = dict(row)
-        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id')}"
+        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
         wins = user.get('pvp_wins', 0)
         losses = user.get('pvp_losses', 0)
         
-        # 👇 ФИКС: Считаем винрейт на лету, иначе он всегда будет 0!
         total = wins + losses
         win_rate = (wins / total * 100) if total > 0 else 0
         
@@ -147,49 +146,10 @@ async def show_top_cards(callback: CallbackQuery):
     
     text = f"🎴 {hbold('Топ по количеству карт')}\n\n"
     
-    for i, user in enumerate(rows, 1):
-        name = user.get('first_name') or user.get('username') or f"Игрок {user['user_id']}"
-        text += f"{i}. {name} - {user['card_count']} карт\n"
-    
-    await callback.message.edit_text(text, reply_markup=top_keyboard())
-    await callback.answer()
-
-
-# Fixed override: ensure sqlite rows are converted to dicts before `.get(...)`.
-async def show_top_cards(callback: CallbackQuery):
-    """Топ по картам"""
-    async with db.connection.execute(
-        """SELECT u.user_id, u.username, u.first_name, COUNT(i.id) as card_count 
-           FROM users u 
-           LEFT JOIN inventory i ON u.user_id = i.user_id 
-           WHERE u.is_dead = 0
-           GROUP BY u.user_id 
-           ORDER BY card_count DESC 
-           LIMIT 10"""
-    ) as cursor:
-        rows = await cursor.fetchall()
-    
-    text = f"🎴 {hbold('Топ по количеству карт')}\n\n"
-    
     for i, row in enumerate(rows, 1):
         user = dict(row)
-        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', 'Неизвестный')}"
+        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
         text += f"{i}. {name} - {user.get('card_count', 0)} карт\n"
-    
-    await callback.message.edit_text(text, reply_markup=top_keyboard())
-    await callback.answer()
-
-async def show_top_levels(callback: CallbackQuery):
-    """Топ по уровню"""
-    top = await db.get_top_by_level(10)
-    
-    text = f"📊 {hbold('Топ по уровню')}\n\n"
-    
-    for i, row in enumerate(top, 1):
-        # 👇 ФИКС: Словарь!
-        user = dict(row)
-        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id')}"
-        text += f"{i}. {name} - Lv.{user.get('level', 1)} ({user.get('exp', 0)} exp)\n"
     
     await callback.message.edit_text(text, reply_markup=top_keyboard())
     await callback.answer()
@@ -202,9 +162,10 @@ async def cmd_topcoin(message: Message):
     
     text = f"💰 {hbold('Топ по монетам')}\n\n"
     
-    for i, user in enumerate(top, 1):
-        name = user.get('first_name') or user.get('username') or f"Игрок {user['user_id']}"
-        text += f"{i}. {name} - {user['coins']}💰\n"
+    for i, row in enumerate(top, 1):
+        user = dict(row)
+        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        text += f"{i}. {name} - {user.get('coins', 0)}💰\n"
     
     await message.answer(text)
 
@@ -216,10 +177,11 @@ async def cmd_toppvp(message: Message):
     
     text = f"⚔️ {hbold('Топ по PvP')}\n\n"
     
-    for i, user in enumerate(top, 1):
-        name = user.get('first_name') or user.get('username') or f"Игрок {user['user_id']}"
-        wins = user['pvp_wins']
-        losses = user['pvp_losses']
+    for i, row in enumerate(top, 1):
+        user = dict(row)
+        name = user.get('first_name') or user.get('username') or f"Игрок {user.get('user_id', '???')}"
+        wins = user.get('pvp_wins', 0)
+        losses = user.get('pvp_losses', 0)
         text += f"{i}. {name} - {wins}W/{losses}L\n"
     
     await message.answer(text)
