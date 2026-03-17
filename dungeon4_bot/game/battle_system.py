@@ -325,15 +325,19 @@ class BattleSystem:
         if not is_defender_faster:
             return False
         
-        # Шанс уклонения при разнице 25-50
-        if 25 <= speed_diff <= 50:
-            return random.random() < 0.30
+        # 1-й тир (разница 25-49): шанс повышен с 30% до 40%
+        if 25 <= speed_diff < 50:
+            return random.random() < 0.40
         
-        # При разнице 50-99 шанс выше
-        if 50 <= speed_diff < 100:
-            return random.random() < 0.50
+        # 2-й тир (разница 50-99): шанс повышен с 50% до 65%
+        elif 50 <= speed_diff < 100:
+            return random.random() < 0.65
+
+        # 3-й тир (разница 100-149): исправлены границы, шанс повышен с 80% до 85%
+        elif 100 <= speed_diff < 150:
+            return random.random() < 0.85
         
-        # При 100+ - полное уклонение (обрабатывается отдельно)
+        # При 150+ - полное уклонение или абсолютный ход (обрабатывается отдельно)
         return False
     
     def execute_round(self) -> BattleLog:
@@ -370,8 +374,8 @@ class BattleSystem:
             return log
             
         # Абсолютное превосходство в скорости (100+)
-        player_abs_speed = self.player_stats.speed - self.enemy_stats['speed'] >= 100
-        enemy_abs_speed = self.enemy_stats['speed'] - self.player_stats.speed >= 100
+        player_abs_speed = self.player_stats.speed - self.enemy_stats['speed'] >= 150
+        enemy_abs_speed = self.enemy_stats['speed'] - self.player_stats.speed >= 150
         
         if player_abs_speed:
             # Игрок настолько быстрый, что враг не может атаковать
@@ -388,7 +392,7 @@ class BattleSystem:
                 log.damage = damage
                 log.damage_type = dmg_type
                 
-                msg = f"⚡ {log.attacker} настолько быстр, что атакует {self.enemy.name} на {damage} урона!"
+                msg = f"⚡︎ {log.attacker} имеет полное превосходство в скорости! ᯓ\n💨 Фигура размывается в пространстве...\n⚡ {log.attacker} настолько быстр, что {self.enemy.name} получает {damage} урона, даже не заметив вашего движения!"
                 
                 # === НОВОЕ: 2. Эффекты от оружия и Вампиризм ===
                 msg += self._apply_on_hit_effects(dmg_type, True)
@@ -419,7 +423,7 @@ class BattleSystem:
                 log.damage = damage
                 log.damage_type = self.enemy.damage_type
                 
-                msg = f"💨 {self.enemy.name} настолько быстр, что атакует {log.defender} на {damage} урона!"
+                msg = f"💨 {self.enemy.name} имеет подавляющее превосходство в скорости!\n {self.enemy.name} исчезает из виду... ᯓ\n🩸 Вы не успеваете даже моргнуть, как он наносит вам {damage} урона!"
                 
                 # === НОВОЕ: Эффекты от врага ===
                 msg += self._apply_on_hit_effects(self.enemy.damage_type, False)
