@@ -392,7 +392,7 @@ class BattleSystem:
                 log.damage = damage
                 log.damage_type = dmg_type
                 
-                msg = f"⚡︎ {log.attacker} имеет полное превосходство в скорости! ᯓ\n💨 Фигура размывается в пространстве...\n⚡ {log.attacker} настолько быстр, что {self.enemy.name} получает {damage} урона, даже не заметив вашего движения!"
+                msg = f"⚡︎ {log.attacker} имеет полное превосходство в скорости! ᯓ\n💨 Ваша фигура размывается в пространстве...\n🗡 {log.attacker} настолько быстр, что {self.enemy.name} получает {damage} урона, даже не заметив вашего движения!"
                 
                 # === НОВОЕ: 2. Эффекты от оружия и Вампиризм ===
                 msg += self._apply_on_hit_effects(dmg_type, True)
