@@ -17,6 +17,7 @@ from game.dungeon import TowerRun, TowerSystem
 from keyboards.inline import main_menu_keyboard, tower_action_keyboard
 from models.player import Player
 from utils.helpers import generate_item_name, generate_random_item
+from aiogram.exceptions import TelegramBadRequest, TelegramRetryAfter
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -195,12 +196,23 @@ async def handle_tower_up(callback: CallbackQuery, user_id: int, user_data: dict
         log = battle.execute_round()
         try:
             await msg.edit_text(battle.get_dynamic_ui(f"🗼 {hbold('Башня')}", log))
+        except TelegramRetryAfter as e:
+            # Если Телеграм ругается на спам, бот покорно ждет нужное время
+            logger.warning("Flood control hit in Tower for user_id=%s. Sleeping %s seconds.", user_id, e.retry_after)
+            await asyncio.sleep(e.retry_after)
+            # Пробуем обновить еще раз после ожидания
+            try:
+                await msg.edit_text(battle.get_dynamic_ui(f"🗼 {hbold('Башня')}", log))
+            except Exception:
+                pass
         except TelegramBadRequest as e:
             if "message is not modified" not in str(e).lower():
                 logger.warning("Tower UI edit failed for user_id=%s: %s", user_id, e)
         except Exception:
             logger.exception("Unexpected tower UI update error for user_id=%s", user_id)
-        await asyncio.sleep(1.5)
+            
+        # Увеличиваем базовую задержку с 1.5 до 2.0 секунд, чтобы не злить Telegram
+        await asyncio.sleep(2.0)
 
     battle_state = battle.state
     tower.current_hp = max(0, battle_state.player_hp)
@@ -267,7 +279,6 @@ async def handle_tower_up(callback: CallbackQuery, user_id: int, user_data: dict
         await complete_tower(callback, user_id, user_data, tower, success=False)
 
     await callback.answer()
-
 
 async def handle_tower_heal(callback: CallbackQuery, user_id: int, user_data: dict, tower: TowerRun):
     """Использовать зелье в Башне"""
