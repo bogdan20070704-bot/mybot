@@ -15,6 +15,7 @@ from database.models import db
 from game.battle_system import BattleResult, BattleSystem
 from models.enemy import get_monarch
 from config.settings import settings
+import asyncio
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -159,13 +160,28 @@ async def handle_monarch_round(callback: CallbackQuery, user_id: int, user_data:
 
     msg = await callback.message.edit_text(battle.get_dynamic_ui(title_text))
 
+    # === ИСПРАВЛЕННЫЙ ЦИКЛ С ЗАЩИТОЙ ОТ БЛОКИРОВОК ===
     while battle.state.result == BattleResult.ONGOING:
         log = battle.execute_round()
         try:
             await msg.edit_text(battle.get_dynamic_ui(title_text, log))
-        except TelegramBadRequest:
-            pass
-        await asyncio.sleep(1.5)
+        except TelegramRetryAfter as e:
+            # Бот ловит ошибку спама и ждет нужное время
+            logger.warning("Flood control hit in Monarch for user_id=%s. Sleeping %s seconds.", user_id, e.retry_after)
+            await asyncio.sleep(e.retry_after)
+            try:
+                await msg.edit_text(battle.get_dynamic_ui(title_text, log))
+            except Exception:
+                pass
+        except TelegramBadRequest as e:
+            if "message is not modified" not in str(e).lower():
+                logger.warning("Monarch UI edit failed for user_id=%s: %s", user_id, e)
+        except Exception:
+            logger.exception("Unexpected monarch UI update error for user_id=%s", user_id)
+            
+        # Увеличенная задержка для безопасности
+        await asyncio.sleep(2.0)
+    # ===================================================
 
     battle_state = battle.state
     run['current_hp'] = max(0, battle_state.player_hp)
@@ -188,7 +204,6 @@ async def handle_monarch_round(callback: CallbackQuery, user_id: int, user_data:
             f"💀 {hbold('ПОРАЖЕНИЕ!')}\n\n"
             f"Вы пали в тронном зале Монарха. Ваше тело выбросили в пустошь..."
         )
-
 
 async def complete_monarch_win(callback: CallbackQuery, user_id: int, user_data: dict, run: dict):
     active_monarch_runs.pop(user_id, None)
